@@ -2,8 +2,10 @@ package server
 
 import (
 	"context"
+	"io/fs"
+	"mime"
 	"net/http"
-	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -40,11 +42,11 @@ func New(cfg config.Config, logger *log.Logger, mediaService *media.Service) *Ap
 	adminAPI.POST("/rescan", handler.Rescan)
 	adminAPI.PATCH("/photos/:id", handler.PatchPhoto)
 
-	e.GET("/admin", serveSPA(cfg), adminAuth)
-	e.GET("/admin/*", serveSPA(cfg), adminAuth)
+	e.GET("/admin", serveSPA(), adminAuth)
+	e.GET("/admin/*", serveSPA(), adminAuth)
 	e.Static("/media/originals", cfg.MediaDir)
 	e.Static("/media/cache", cfg.CacheDir)
-	e.GET("/*", serveSPA(cfg))
+	e.GET("/*", serveSPA())
 
 	return &App{cfg: cfg, echo: e, logger: logger}
 }
@@ -61,21 +63,38 @@ func (a *App) Shutdown(ctx context.Context) error {
 	return a.echo.Shutdown(ctx)
 }
 
-func serveSPA(cfg config.Config) echo.HandlerFunc {
-	indexPath := filepath.Join(cfg.FrontendDistDir, "index.html")
+func serveSPA() echo.HandlerFunc {
+	frontendFS, err := fs.Sub(embeddedDist, "dist")
+	if err != nil {
+		panic(err)
+	}
+
 	return func(c echo.Context) error {
-		requested := strings.TrimPrefix(c.Request().URL.Path, "/")
-		if requested != "" {
-			candidate := filepath.Join(cfg.FrontendDistDir, filepath.FromSlash(requested))
-			if stat, err := os.Stat(candidate); err == nil && !stat.IsDir() {
-				return c.File(candidate)
+		requested := path.Clean(strings.TrimPrefix(c.Request().URL.Path, "/"))
+		if requested == "." {
+			requested = ""
+		}
+
+		if requested != "" && !strings.HasPrefix(requested, "admin") {
+			if stat, err := fs.Stat(frontendFS, requested); err == nil && !stat.IsDir() {
+				return serveEmbeddedFile(c, frontendFS, requested)
 			}
 		}
 
-		if _, err := os.Stat(indexPath); err != nil {
-			return c.String(http.StatusServiceUnavailable, "frontend build missing; run bun run build in app/")
-		}
-
-		return c.File(indexPath)
+		return serveEmbeddedFile(c, frontendFS, "index.html")
 	}
+}
+
+func serveEmbeddedFile(c echo.Context, filesystem fs.FS, name string) error {
+	data, err := fs.ReadFile(filesystem, name)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "asset not found")
+	}
+
+	contentType := mime.TypeByExtension(filepath.Ext(name))
+	if contentType == "" {
+		contentType = http.DetectContentType(data)
+	}
+
+	return c.Blob(http.StatusOK, contentType, data)
 }

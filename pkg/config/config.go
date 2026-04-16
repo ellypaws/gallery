@@ -10,16 +10,15 @@ import (
 )
 
 type Config struct {
-	AppEnv          string
-	Port            string
-	SiteTitle       string
-	MediaDir        string
-	DataDir         string
-	CacheDir        string
-	DBPath          string
-	FrontendDistDir string
-	AdminUser       string
-	AdminPass       string
+	AppEnv    string
+	Port      string
+	SiteTitle string
+	MediaDir  string
+	DataDir   string
+	CacheDir  string
+	DBPath    string
+	AdminUser string
+	AdminPass string
 }
 
 func Load() (Config, error) {
@@ -33,16 +32,15 @@ func Load() (Config, error) {
 	dataDir := envOr("DATA_DIR", filepath.Join(root, "data"))
 	cacheDir := envOr("CACHE_DIR", filepath.Join(dataDir, "cache"))
 	cfg := Config{
-		AppEnv:          envOr("APP_ENV", "development"),
-		Port:            envOr("PORT", "8080"),
-		SiteTitle:       envOr("SITE_TITLE", "Parallax Frames"),
-		MediaDir:        envOr("MEDIA_DIR", filepath.Join(root, "photos")),
-		DataDir:         dataDir,
-		CacheDir:        cacheDir,
-		DBPath:          envOr("DB_PATH", filepath.Join(dataDir, "gallery.db")),
-		FrontendDistDir: envOr("FRONTEND_DIST_DIR", filepath.Join(root, "app", "dist")),
-		AdminUser:       envOr("ADMIN_USER", "gallery"),
-		AdminPass:       envOr("ADMIN_PASS", "gallery"),
+		AppEnv:    envOr("APP_ENV", "development"),
+		Port:      envOr("PORT", "8080"),
+		SiteTitle: envOr("SITE_TITLE", "Elly"),
+		MediaDir:  envOr("MEDIA_DIR", filepath.Join(root, "photos")),
+		DataDir:   dataDir,
+		CacheDir:  cacheDir,
+		DBPath:    envOr("DB_PATH", filepath.Join(dataDir, "gallery.db")),
+		AdminUser: envOr("ADMIN_USER", "gallery"),
+		AdminPass: envOr("ADMIN_PASS", "gallery"),
 	}
 
 	for _, dir := range []string{cfg.MediaDir, cfg.DataDir, cfg.CacheDir} {
@@ -55,7 +53,6 @@ func Load() (Config, error) {
 	cfg.DataDir = filepath.Clean(cfg.DataDir)
 	cfg.CacheDir = filepath.Clean(cfg.CacheDir)
 	cfg.DBPath = filepath.Clean(cfg.DBPath)
-	cfg.FrontendDistDir = filepath.Clean(cfg.FrontendDistDir)
 
 	return cfg, nil
 }

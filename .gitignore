@@ -3,6 +3,7 @@ vendor
 cache
 logs
 app/dist
+pkg/server/dist
 data
 photos
 

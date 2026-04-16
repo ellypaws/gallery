@@ -143,11 +143,6 @@ function VirtualColumn({
                   aspectRatio: `${entry.photo.width} / ${entry.photo.height}`,
                 }}
               >
-                <div
-                  className="absolute inset-0 scale-105 bg-cover bg-center blur-2xl"
-                  style={{ backgroundImage: `url(${entry.photo.placeholder || entry.photo.src})` }}
-                  aria-hidden="true"
-                />
                 <img
                   src={entry.photo.src}
                   srcSet={entry.photo.srcSet}
@@ -155,11 +150,8 @@ function VirtualColumn({
                   alt={entry.photo.alt}
                   loading="lazy"
                   decoding="async"
-                  className="relative h-full w-full object-cover"
+                  className="h-full w-full object-cover"
                 />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/50 via-black/0 to-transparent p-4">
-                  <p className="max-w-[20ch] text-sm font-medium text-white">{entry.photo.title}</p>
-                </div>
               </div>
             </button>
           )

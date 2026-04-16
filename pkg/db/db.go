@@ -9,6 +9,7 @@ import (
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 	_ "modernc.org/sqlite"
 )
 
@@ -17,7 +18,9 @@ func Open(cfg config.Config) (*gorm.DB, error) {
 	db, err := gorm.Open(sqlite.New(sqlite.Config{
 		DriverName: "sqlite",
 		DSN:        dsn,
-	}), &gorm.Config{})
+	}), &gorm.Config{
+		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
+	})
 	if err != nil {
 		return nil, err
 	}

@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { gsap } from 'gsap'
 import { Aperture, Camera, ChevronLeft, ChevronRight, Clock3, X } from 'lucide-react'
 
 import type { GalleryItem } from '../lib/types'
+import { LoadingDial } from './LoadingDial'
 
 type LightboxProps = {
   photos: GalleryItem[]
@@ -15,6 +16,9 @@ type LightboxProps = {
 export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: LightboxProps) {
   const overlayRef = useRef<HTMLDivElement | null>(null)
   const photo = photos[activeIndex]
+  const [assetURL, setAssetURL] = useState('')
+  const [loadProgress, setLoadProgress] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -40,23 +44,93 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
       )
       gsap.fromTo(
         '.lightbox-meta-row',
-        { autoAlpha: 0, x: 12 },
-        { autoAlpha: 1, x: 0, duration: 0.28, stagger: 0.04, delay: 0.1, ease: 'power2.out' },
+        { autoAlpha: 0, y: 10 },
+        { autoAlpha: 1, y: 0, duration: 0.28, stagger: 0.04, delay: 0.1, ease: 'power2.out' },
       )
     }, overlayRef)
 
     return () => ctx.revert()
   }, [activeIndex])
 
+  useEffect(() => {
+    const controller = new AbortController()
+    let objectURL = ''
+    const sourceURL = photo.originalSrc || photo.src
+
+    setAssetURL('')
+    setLoadProgress(0)
+    setIsLoading(true)
+
+    void (async () => {
+      try {
+        const response = await fetch(sourceURL, {
+          signal: controller.signal,
+        })
+        if (!response.ok) {
+          throw new Error('image request failed')
+        }
+
+        const totalBytes = Number(response.headers.get('Content-Length') || '0')
+        if (!response.body || totalBytes <= 0) {
+          const blob = await response.blob()
+          objectURL = URL.createObjectURL(blob)
+          setAssetURL(objectURL)
+          setLoadProgress(1)
+          setIsLoading(false)
+          return
+        }
+
+        const reader = response.body.getReader()
+        const chunks: BlobPart[] = []
+        let receivedBytes = 0
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) {
+            break
+          }
+          if (!value) {
+            continue
+          }
+          chunks.push(value.slice() as unknown as BlobPart)
+          receivedBytes += value.byteLength
+          setLoadProgress(receivedBytes / totalBytes)
+        }
+
+        const blob = new Blob(chunks, {
+          type: response.headers.get('Content-Type') || 'image/jpeg',
+        })
+        objectURL = URL.createObjectURL(blob)
+        setAssetURL(objectURL)
+        setLoadProgress(1)
+        setIsLoading(false)
+      } catch {
+        if (controller.signal.aborted) {
+          return
+        }
+        setAssetURL(sourceURL)
+        setLoadProgress(1)
+        setIsLoading(false)
+      }
+    })()
+
+    return () => {
+      controller.abort()
+      if (objectURL) {
+        URL.revokeObjectURL(objectURL)
+      }
+    }
+  }, [photo.id, photo.originalSrc, photo.src])
+
   const metaRows = useMemo(
     () =>
       [
-        { key: 'camera', label: 'Camera', value: photo.camera, icon: Camera },
-        { key: 'lens', label: 'Lens', value: photo.lens, icon: Camera },
-        { key: 'aperture', label: 'Aperture', value: photo.aperture, icon: Aperture },
-        { key: 'shutter', label: 'Shutter', value: photo.shutter, icon: Clock3 },
-        { key: 'iso', label: 'ISO', value: photo.iso, icon: Camera },
-        { key: 'focal', label: 'Focal', value: photo.focalLength, icon: Camera },
+        { key: 'camera', value: photo.camera, icon: Camera },
+        { key: 'lens', value: photo.lens, icon: Camera },
+        { key: 'aperture', value: photo.aperture, icon: Aperture },
+        { key: 'shutter', value: photo.shutter, icon: Clock3 },
+        { key: 'iso', value: photo.iso, icon: Camera },
+        { key: 'focal', value: photo.focalLength, icon: Camera },
       ].filter((row) => row.value),
     [photo],
   )
@@ -67,21 +141,9 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
       className="fixed inset-0 z-[60] bg-black/88 px-4 py-4 text-white backdrop-blur-sm md:px-6"
       role="dialog"
       aria-modal="true"
-      aria-label={photo.title}
+      aria-label={photo.alt}
     >
-      <div className="lightbox-panel mx-auto flex h-full max-w-[1700px] flex-col gap-4 md:flex-row md:gap-6">
-        <div className="flex items-center justify-between md:hidden">
-          <p className="text-sm uppercase tracking-[0.18em] text-white/60">{photo.title}</p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md border border-white/15 p-2 text-white transition hover:border-white/30 hover:bg-white/8"
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
+      <div className="lightbox-panel mx-auto flex h-full max-w-[1700px] flex-col">
         <div className="relative min-h-0 flex-1 overflow-hidden rounded-md border border-white/10 bg-white/4">
           <button
             type="button"
@@ -99,60 +161,44 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
           >
             <ChevronRight className="h-5 w-5" />
           </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-3 top-3 z-10 rounded-md border border-white/15 bg-black/30 p-2 text-white transition hover:border-white/30 hover:bg-black/50"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          {isLoading ? <LoadingDial progress={loadProgress} className="absolute right-3 top-16 z-10" /> : null}
+          <img
+            src={photo.placeholder || photo.src}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 h-full w-full scale-105 object-contain blur-3xl opacity-65"
+          />
           <img
             key={photo.id}
-            src={photo.originalSrc || photo.src}
-            srcSet={photo.srcSet}
-            sizes="100vw"
+            src={assetURL || photo.placeholder || photo.src}
             alt={photo.alt}
-            className="h-full w-full object-contain"
+            className="relative z-[1] h-full w-full object-contain"
           />
-        </div>
-
-        <aside className="flex w-full shrink-0 flex-col justify-between rounded-md border border-white/10 bg-white/6 p-4 md:w-[360px]">
-          <div>
-            <div className="hidden items-start justify-between md:flex">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.18em] text-white/50">Frame</p>
-                <h2 className="mt-2 text-3xl font-semibold text-white">{photo.title}</h2>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-md border border-white/15 p-2 text-white transition hover:border-white/30 hover:bg-white/8"
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {photo.description ? (
-              <p className="mt-4 max-w-[34ch] text-sm leading-6 text-white/72">{photo.description}</p>
-            ) : null}
-
-            <div className="mt-6 space-y-3">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/68 via-black/16 to-transparent px-3 pb-3 pt-16 md:px-5 md:pb-5">
+            <div className="flex flex-wrap gap-2">
               {metaRows.map((row) => {
                 const Icon = row.icon
                 return (
                   <div
                     key={row.key}
-                    className="lightbox-meta-row flex items-center justify-between rounded-md border border-white/10 px-3 py-3"
+                    className="lightbox-meta-row inline-flex items-center gap-2 rounded-md border border-white/12 bg-black/36 px-3 py-2 text-sm text-white/84 backdrop-blur-md"
                   >
-                    <div className="flex items-center gap-2 text-white/60">
-                      <Icon className="h-4 w-4" />
-                      <span className="text-sm">{row.label}</span>
-                    </div>
-                    <span className="text-sm font-medium text-white">{row.value}</span>
+                    <Icon className="h-4 w-4 shrink-0 text-white/58" />
+                    <span>{row.value}</span>
                   </div>
                 )
               })}
             </div>
           </div>
-
-          <div className="mt-6 border-t border-white/10 pt-4 text-xs uppercase tracking-[0.14em] text-white/40">
-            {activeIndex + 1} / {photos.length}
-          </div>
-        </aside>
+        </div>
       </div>
     </div>
   )

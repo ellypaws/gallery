@@ -154,74 +154,83 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
       aria-modal="true"
       aria-label={photo.alt}
     >
-      <div className="lightbox-panel mx-auto flex h-full max-w-[1700px] flex-col">
-        <aside className="pointer-events-none absolute left-5 top-5 bottom-5 z-10 hidden w-[248px] md:flex md:flex-col md:justify-start">
-          <div className="flex flex-col items-start gap-3">
-            {metaRows.map((row) => (
-              <div key={row.key} className="lightbox-meta-row flex items-start gap-3 text-white/86">
-                <MetaIcon row={row} />
-                <div className="flex flex-col items-start gap-0.5">
-                  <span className="text-[11px] uppercase tracking-[0.14em] text-white/42">{row.label}</span>
-                  <span className="text-sm leading-5">
-                    {'isAperture' in row && row.isAperture ? (
-                      <>
-                        <span className="italic">f</span>
-                        <span className="ml-0.5">{row.value}</span>
-                      </>
-                    ) : (
-                      row.value
-                    )}
-                  </span>
-                </div>
+      <img
+        src={photo.placeholder || photo.src}
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover blur-3xl opacity-30"
+      />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_18%,rgba(0,0,0,0.32)_56%,rgba(0,0,0,0.84)_100%)]" />
+
+      <aside className="pointer-events-none absolute left-5 top-1/2 z-10 hidden w-[248px] -translate-y-1/2 md:flex md:flex-col">
+        <div className="flex flex-col items-start gap-3">
+          {metaRows.map((row) => (
+            <div key={row.key} className="lightbox-meta-row flex items-start gap-3 text-white/86">
+              <MetaIcon row={row} />
+              <div className="flex flex-col items-start gap-0.5">
+                <span className="text-[11px] uppercase tracking-[0.14em] text-white/42">{row.label}</span>
+                <span className="text-sm leading-5">
+                  {row.isAperture ? (
+                    <>
+                      <span className="italic">f</span>
+                      <span className="ml-0.5">{row.value}</span>
+                    </>
+                  ) : (
+                    row.value
+                  )}
+                </span>
               </div>
-            ))}
-          </div>
-        </aside>
+            </div>
+          ))}
+        </div>
+      </aside>
+
+      <div className="lightbox-panel mx-auto flex h-full max-w-[1700px] flex-col">
         <div className="flex min-h-0 flex-1 items-center justify-center">
-          <div className="relative h-full w-full max-w-[1500px] overflow-hidden bg-white/4 md:max-w-[calc(100vw-22rem)]">
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation()
-              onPrev()
-            }}
-            className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-md border border-white/15 bg-black/30 p-2 text-white transition hover:border-white/30 hover:bg-black/50"
-            aria-label="Previous photo"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation()
-              onNext()
-            }}
-            className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-md border border-white/15 bg-black/30 p-2 text-white transition hover:border-white/30 hover:bg-black/50"
-            aria-label="Next photo"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </button>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation()
-              onClose()
-            }}
-            className="absolute right-3 top-3 z-10 rounded-md border border-white/15 bg-black/30 p-2 text-white transition hover:border-white/30 hover:bg-black/50"
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
-          {isLoading ? <LoadingDial progress={loadProgress} className="absolute right-3 top-16 z-10" /> : null}
-          <div className="pointer-events-none absolute left-3 top-3 z-10 flex max-w-[280px] flex-col items-start gap-2 md:hidden">
-            {metaRows.map((row) => {
-              return (
+          <div className="relative h-full w-full max-w-[1500px] md:max-w-[min(1500px,calc(100vw-3rem))]">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                onPrev()
+              }}
+              className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-md border border-white/15 bg-black/30 p-2 text-white transition hover:border-white/30 hover:bg-black/50"
+              aria-label="Previous photo"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                onNext()
+              }}
+              className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-md border border-white/15 bg-black/30 p-2 text-white transition hover:border-white/30 hover:bg-black/50"
+              aria-label="Next photo"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                onClose()
+              }}
+              className="absolute right-3 top-3 z-10 rounded-md border border-white/15 bg-black/30 p-2 text-white transition hover:border-white/30 hover:bg-black/50"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            {isLoading ? <LoadingDial progress={loadProgress} className="absolute right-3 top-16 z-10" /> : null}
+
+            <div className="pointer-events-none absolute left-3 top-3 z-10 flex max-w-[280px] flex-col items-start gap-2 md:hidden">
+              {metaRows.map((row) => (
                 <div key={row.key} className="lightbox-meta-row flex items-start gap-3 text-white/86">
                   <MetaIcon row={row} />
                   <div className="flex flex-col items-start gap-0.5">
                     <span className="text-[11px] uppercase tracking-[0.14em] text-white/42">{row.label}</span>
                     <span className="text-sm leading-5">
-                      {'isAperture' in row && row.isAperture ? (
+                      {row.isAperture ? (
                         <>
                           <span className="italic">f</span>
                           <span className="ml-0.5">{row.value}</span>
@@ -232,22 +241,16 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
                     </span>
                   </div>
                 </div>
-              )
-            })}
-          </div>
-          <img
-            src={photo.placeholder || photo.src}
-            alt=""
-            aria-hidden="true"
-            className="absolute inset-0 h-full w-full scale-105 object-contain blur-3xl opacity-65"
-          />
-          <img
-            key={photo.id}
-            src={assetURL || photo.placeholder || photo.src}
-            alt={photo.alt}
-            onClick={(event) => event.stopPropagation()}
-            className="relative z-[1] h-full w-full object-contain"
-          />
+              ))}
+            </div>
+
+            <img
+              key={photo.id}
+              src={assetURL || photo.placeholder || photo.src}
+              alt={photo.alt}
+              onClick={(event) => event.stopPropagation()}
+              className="relative z-[1] h-full w-full object-contain"
+            />
           </div>
         </div>
       </div>
@@ -273,18 +276,14 @@ function formatAperture(value: string) {
   return trimmed
 }
 
-function MetaIcon({
-  row,
-}: {
-  row: MetaRow
-}) {
-  if ('kind' in row) {
-    if (row.kind === 'iso') {
-      return <img src="/iso.svg" alt="" aria-hidden="true" className="mt-[1px] h-4 w-4 shrink-0 invert brightness-200" />
-    }
-    if (row.kind === 'lens') {
-      return <img src="/lens.svg" alt="" aria-hidden="true" className="mt-[1px] h-4 w-4 shrink-0 invert brightness-200" />
-    }
+function MetaIcon({ row }: { row: MetaRow }) {
+  if (row.kind === 'iso') {
+    return <img src="/iso.svg" alt="" aria-hidden="true" className="mt-[1px] h-4 w-4 shrink-0 invert brightness-200" />
+  }
+  if (row.kind === 'lens') {
+    return <img src="/lens.svg" alt="" aria-hidden="true" className="mt-[1px] h-4 w-4 shrink-0 invert brightness-200" />
+  }
+  if (row.kind === 'camera') {
     return <Camera className="mt-[1px] h-4 w-4 shrink-0 text-white/54" />
   }
 

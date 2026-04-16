@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"gallery/pkg/config"
@@ -24,6 +25,7 @@ type Service struct {
 	cfg    config.Config
 	db     *gorm.DB
 	logger *log.Logger
+	syncMu sync.Mutex
 }
 
 type GalleryResponse struct {
@@ -68,6 +70,9 @@ func NewService(cfg config.Config, db *gorm.DB, logger *log.Logger) *Service {
 }
 
 func (s *Service) SyncLibrary(ctx context.Context) error {
+	s.syncMu.Lock()
+	defer s.syncMu.Unlock()
+
 	files := make([]string, 0, 64)
 	err := filepath.WalkDir(s.cfg.MediaDir, func(path string, d os.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -260,6 +265,9 @@ func (s *Service) Gallery(ctx context.Context) (GalleryResponse, error) {
 }
 
 func (s *Service) UploadFiles(ctx context.Context, filenames []string) error {
+	s.syncMu.Lock()
+	defer s.syncMu.Unlock()
+
 	for _, name := range filenames {
 		select {
 		case <-ctx.Done():

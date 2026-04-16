@@ -8,6 +8,7 @@ require (
 	github.com/disintegration/imaging v1.6.2
 	github.com/dlecorfec/progjpeg v1.0.0
 	github.com/dsoprea/go-exif/v3 v3.0.1
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/joho/godotenv v1.5.1
 	github.com/labstack/echo/v4 v4.15.1
 	gorm.io/driver/sqlite v1.6.0

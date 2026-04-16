@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { gsap } from 'gsap'
-import { Aperture, Camera, ChevronLeft, ChevronRight, Clock3, X } from 'lucide-react'
+import { Aperture, Camera, ChevronLeft, ChevronRight, Clock3, Search, X } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 import type { GalleryItem } from '../lib/types'
 import { LoadingDial } from './LoadingDial'
@@ -11,6 +12,15 @@ type LightboxProps = {
   onClose: () => void
   onPrev: () => void
   onNext: () => void
+}
+
+type MetaRow = {
+  key: string
+  label: string
+  value: string
+  kind?: 'camera' | 'lens' | 'iso'
+  icon?: LucideIcon
+  isAperture?: boolean
 }
 
 export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: LightboxProps) {
@@ -123,14 +133,14 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
   }, [photo.id, photo.originalSrc, photo.src])
 
   const metaRows = useMemo(
-    () =>
+    (): MetaRow[] =>
       [
-        { key: 'camera', label: 'Camera', value: photo.camera, icon: Camera },
-        { key: 'lens', label: 'Lens', value: photo.lens, icon: Camera },
+        { key: 'camera', label: 'Camera', value: photo.camera, kind: 'camera' as const },
+        { key: 'lens', label: 'Lens', value: photo.lens, kind: 'lens' as const },
         { key: 'aperture', label: 'Aperture', value: formatAperture(photo.aperture), icon: Aperture, isAperture: true },
         { key: 'shutter', label: 'Shutter', value: photo.shutter, icon: Clock3 },
-        { key: 'iso', label: 'ISO', value: photo.iso, icon: Camera },
-        { key: 'focal', label: 'Focal', value: photo.focalLength, icon: Camera },
+        { key: 'iso', label: 'ISO', value: photo.iso, kind: 'iso' as const },
+        { key: 'focal', label: 'Focal Length', value: photo.focalLength, icon: Search },
       ].filter((row) => row.value),
     [photo],
   )
@@ -145,7 +155,30 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
       aria-label={photo.alt}
     >
       <div className="lightbox-panel mx-auto flex h-full max-w-[1700px] flex-col">
-        <div className="relative min-h-0 flex-1 overflow-hidden bg-white/4">
+        <aside className="pointer-events-none absolute left-5 top-5 bottom-5 z-10 hidden w-[248px] md:flex md:flex-col md:justify-start">
+          <div className="flex flex-col items-start gap-3">
+            {metaRows.map((row) => (
+              <div key={row.key} className="lightbox-meta-row flex items-start gap-3 text-white/86">
+                <MetaIcon row={row} />
+                <div className="flex flex-col items-start gap-0.5">
+                  <span className="text-[11px] uppercase tracking-[0.14em] text-white/42">{row.label}</span>
+                  <span className="text-sm leading-5">
+                    {'isAperture' in row && row.isAperture ? (
+                      <>
+                        <span className="italic">f</span>
+                        <span className="ml-0.5">{row.value}</span>
+                      </>
+                    ) : (
+                      row.value
+                    )}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </aside>
+        <div className="flex min-h-0 flex-1 items-center justify-center">
+          <div className="relative h-full w-full max-w-[1500px] overflow-hidden bg-white/4 md:max-w-[calc(100vw-22rem)]">
           <button
             type="button"
             onClick={(event) => {
@@ -180,12 +213,11 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
             <X className="h-4 w-4" />
           </button>
           {isLoading ? <LoadingDial progress={loadProgress} className="absolute right-3 top-16 z-10" /> : null}
-          <div className="pointer-events-none absolute left-3 top-3 z-10 flex max-w-[320px] flex-col items-start gap-2 md:left-5 md:top-5">
+          <div className="pointer-events-none absolute left-3 top-3 z-10 flex max-w-[280px] flex-col items-start gap-2 md:hidden">
             {metaRows.map((row) => {
-              const Icon = row.icon
               return (
                 <div key={row.key} className="lightbox-meta-row flex items-start gap-3 text-white/86">
-                  <Icon className="mt-[1px] h-4 w-4 shrink-0 text-white/54" />
+                  <MetaIcon row={row} />
                   <div className="flex flex-col items-start gap-0.5">
                     <span className="text-[11px] uppercase tracking-[0.14em] text-white/42">{row.label}</span>
                     <span className="text-sm leading-5">
@@ -216,6 +248,7 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
             onClick={(event) => event.stopPropagation()}
             className="relative z-[1] h-full w-full object-contain"
           />
+          </div>
         </div>
       </div>
     </div>
@@ -238,4 +271,23 @@ function formatAperture(value: string) {
   }
 
   return trimmed
+}
+
+function MetaIcon({
+  row,
+}: {
+  row: MetaRow
+}) {
+  if ('kind' in row) {
+    if (row.kind === 'iso') {
+      return <img src="/iso.svg" alt="" aria-hidden="true" className="mt-[1px] h-4 w-4 shrink-0 invert brightness-200" />
+    }
+    if (row.kind === 'lens') {
+      return <img src="/lens.svg" alt="" aria-hidden="true" className="mt-[1px] h-4 w-4 shrink-0 invert brightness-200" />
+    }
+    return <Camera className="mt-[1px] h-4 w-4 shrink-0 text-white/54" />
+  }
+
+  const Icon = row.icon ?? Camera
+  return <Icon className="mt-[1px] h-4 w-4 shrink-0 text-white/54" />
 }

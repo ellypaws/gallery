@@ -31,6 +31,11 @@ func main() {
 	if err := mediaService.SyncLibrary(context.Background()); err != nil {
 		logger.Error("initial media sync failed", "err", err)
 	}
+	watchCtx, watchCancel := context.WithCancel(context.Background())
+	defer watchCancel()
+	if err := mediaService.StartWatcher(watchCtx); err != nil {
+		logger.Error("media watcher failed to start", "err", err)
+	}
 
 	app := server.New(cfg, logger, mediaService)
 
@@ -46,6 +51,7 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	watchCancel()
 
 	if err := app.Shutdown(ctx); err != nil {
 		logger.Error("shutdown failed", "err", err)

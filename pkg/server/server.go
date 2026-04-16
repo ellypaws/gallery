@@ -44,8 +44,8 @@ func New(cfg config.Config, logger *log.Logger, mediaService *media.Service) *Ap
 
 	e.GET("/admin", serveSPA(), adminAuth)
 	e.GET("/admin/*", serveSPA(), adminAuth)
-	e.Static("/media/originals", cfg.MediaDir)
-	e.Static("/media/cache", cfg.CacheDir)
+	e.GET("/media/originals/*", serveMedia(cfg.MediaDir))
+	e.GET("/media/cache/*", serveMedia(cfg.CacheDir))
 	e.GET("/*", serveSPA())
 
 	return &App{cfg: cfg, echo: e, logger: logger}
@@ -97,4 +97,19 @@ func serveEmbeddedFile(c echo.Context, filesystem fs.FS, name string) error {
 	}
 
 	return c.Blob(http.StatusOK, contentType, data)
+}
+
+func serveMedia(baseDir string) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		p := c.Param("*")
+		if p == "" {
+			return c.NoContent(http.StatusNotFound)
+		}
+
+		cleanPath := filepath.Clean("/" + p)
+		filePath := filepath.Join(baseDir, cleanPath)
+
+		c.Response().Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		return c.File(filePath)
+	}
 }

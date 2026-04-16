@@ -40,7 +40,7 @@ export function MasonryGallery({ photos, onOpen }: MasonryGalleryProps) {
 
   const columns = useMemo(() => {
     const gap = width >= 960 ? 14 : 10
-    const count = width >= 1440 ? 4 : width >= 960 ? 3 : width >= 640 ? 2 : 1
+    const count = width >= 2560 ? 4 : width >= 1920 ? 3 : width >= 1440 ? 2 : 1
     const columnWidth = width > 0 ? Math.max(240, Math.floor((width - gap * (count - 1)) / count)) : 320
     const next = Array.from({ length: count }, (_, index) => ({
       key: `column-${index}`,

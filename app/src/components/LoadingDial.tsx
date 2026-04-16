@@ -1,16 +1,14 @@
 type LoadingDialProps = {
-  progress: number
   className?: string
 }
 
-export function LoadingDial({ progress, className = '' }: LoadingDialProps) {
-  const clampedProgress = Math.max(0, Math.min(progress, 1))
+export function LoadingDial({ className = '' }: LoadingDialProps) {
   const radius = 18
   const circumference = 2 * Math.PI * radius
-  const dashOffset = circumference * (1 - clampedProgress)
+  const dashOffset = circumference * 0.75
 
   return (
-    <svg className={`h-11 w-11 -rotate-90 ${className}`} viewBox="0 0 44 44" aria-hidden="true">
+    <svg className={`h-11 w-11 animate-spin ${className}`} viewBox="0 0 44 44" aria-hidden="true">
       <circle
         cx="22"
         cy="22"

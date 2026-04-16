@@ -27,7 +27,6 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
   const overlayRef = useRef<HTMLDivElement | null>(null)
   const photo = photos[activeIndex]
   const [assetURL, setAssetURL] = useState('')
-  const [loadProgress, setLoadProgress] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -63,73 +62,9 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
   }, [activeIndex])
 
   useEffect(() => {
-    const controller = new AbortController()
-    let objectURL = ''
-    const sourceURL = photo.originalSrc || photo.src
-
-    setAssetURL('')
-    setLoadProgress(0)
     setIsLoading(true)
-
-    void (async () => {
-      try {
-        const response = await fetch(sourceURL, {
-          signal: controller.signal,
-        })
-        if (!response.ok) {
-          throw new Error('image request failed')
-        }
-
-        const totalBytes = Number(response.headers.get('Content-Length') || '0')
-        if (!response.body || totalBytes <= 0) {
-          const blob = await response.blob()
-          objectURL = URL.createObjectURL(blob)
-          setAssetURL(objectURL)
-          setLoadProgress(1)
-          setIsLoading(false)
-          return
-        }
-
-        const reader = response.body.getReader()
-        const chunks: BlobPart[] = []
-        let receivedBytes = 0
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) {
-            break
-          }
-          if (!value) {
-            continue
-          }
-          chunks.push(value.slice() as unknown as BlobPart)
-          receivedBytes += value.byteLength
-          setLoadProgress(receivedBytes / totalBytes)
-        }
-
-        const blob = new Blob(chunks, {
-          type: response.headers.get('Content-Type') || 'image/jpeg',
-        })
-        objectURL = URL.createObjectURL(blob)
-        setAssetURL(objectURL)
-        setLoadProgress(1)
-        setIsLoading(false)
-      } catch {
-        if (controller.signal.aborted) {
-          return
-        }
-        setAssetURL(sourceURL)
-        setLoadProgress(1)
-        setIsLoading(false)
-      }
-    })()
-
-    return () => {
-      controller.abort()
-      if (objectURL) {
-        URL.revokeObjectURL(objectURL)
-      }
-    }
+    const sourceURL = photo.originalSrc || photo.src
+    setAssetURL(sourceURL)
   }, [photo.id, photo.originalSrc, photo.src])
 
   const metaRows = useMemo(
@@ -221,7 +156,7 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
             >
               <X className="h-4 w-4" />
             </button>
-            {isLoading ? <LoadingDial progress={loadProgress} className="absolute right-3 top-16 z-10" /> : null}
+            {isLoading ? <LoadingDial className="absolute right-3 top-16 z-10" /> : null}
 
             <div className="pointer-events-none absolute left-3 top-3 z-10 flex max-w-[280px] flex-col items-start gap-2 md:hidden">
               {metaRows.map((row) => (
@@ -248,8 +183,11 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
               key={photo.id}
               src={assetURL || photo.placeholder || photo.src}
               alt={photo.alt}
+              srcSet={photo.srcSet}
+              sizes={photo.sizes}
+              onLoad={() => setIsLoading(false)}
               onClick={(event) => event.stopPropagation()}
-              className="relative z-[1] h-full w-full object-contain"
+              className={`relative z-[1] h-full w-full object-contain transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
             />
           </div>
         </div>

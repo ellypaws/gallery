@@ -2,6 +2,9 @@
 vendor
 cache
 logs
+app/dist
+data
+photos
 
 # config
 *.txt

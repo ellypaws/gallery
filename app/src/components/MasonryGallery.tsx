@@ -39,7 +39,7 @@ export function MasonryGallery({ photos, onOpen }: MasonryGalleryProps) {
   }, [])
 
   const columns = useMemo(() => {
-    const gap = width >= 960 ? 18 : 14
+    const gap = width >= 960 ? 14 : 10
     const count = width >= 1440 ? 4 : width >= 960 ? 3 : width >= 640 ? 2 : 1
     const columnWidth = width > 0 ? Math.max(240, Math.floor((width - gap * (count - 1)) / count)) : 320
     const next = Array.from({ length: count }, (_, index) => ({
@@ -126,34 +126,39 @@ function VirtualColumn({
           }
 
           return (
-            <button
+            <div
               key={virtualItem.key}
-              type="button"
               ref={virtualizer.measureElement}
               data-index={virtualItem.index}
-              onClick={() => onOpen(entry.index)}
-              className="gallery-card absolute left-0 w-full overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] text-left shadow-[var(--shadow)] transition duration-300 hover:-translate-y-1 hover:border-[var(--accent)]"
+              className="gallery-card absolute left-0 w-full"
               style={{
                 transform: `translateY(${virtualItem.start - virtualizer.options.scrollMargin}px)`,
+                paddingBottom: `${gap}px`,
               }}
             >
-              <div
-                className="relative overflow-hidden"
-                style={{
-                  aspectRatio: `${entry.photo.width} / ${entry.photo.height}`,
-                }}
+              <button
+                type="button"
+                onClick={() => onOpen(entry.index)}
+                className="block w-full overflow-hidden text-left transition duration-300 hover:-translate-y-1"
               >
-                <img
-                  src={entry.photo.src}
-                  srcSet={entry.photo.srcSet}
-                  sizes={entry.photo.sizes}
-                  alt={entry.photo.alt}
-                  loading="lazy"
-                  decoding="async"
-                  className="h-full w-full object-cover"
-                />
-              </div>
-            </button>
+                <div
+                  className="relative overflow-hidden"
+                  style={{
+                    aspectRatio: `${entry.photo.width} / ${entry.photo.height}`,
+                  }}
+                >
+                  <img
+                    src={entry.photo.src}
+                    srcSet={entry.photo.srcSet}
+                    sizes={entry.photo.sizes}
+                    alt={entry.photo.alt}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              </button>
+            </div>
           )
         })}
       </div>

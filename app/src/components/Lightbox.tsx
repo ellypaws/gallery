@@ -125,12 +125,12 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
   const metaRows = useMemo(
     () =>
       [
-        { key: 'camera', value: photo.camera, icon: Camera },
-        { key: 'lens', value: photo.lens, icon: Camera },
-        { key: 'aperture', value: photo.aperture, icon: Aperture },
-        { key: 'shutter', value: photo.shutter, icon: Clock3 },
-        { key: 'iso', value: photo.iso, icon: Camera },
-        { key: 'focal', value: photo.focalLength, icon: Camera },
+        { key: 'camera', label: 'Camera', value: photo.camera, icon: Camera },
+        { key: 'lens', label: 'Lens', value: photo.lens, icon: Camera },
+        { key: 'aperture', label: 'Aperture', value: formatAperture(photo.aperture), icon: Aperture, isAperture: true },
+        { key: 'shutter', label: 'Shutter', value: photo.shutter, icon: Clock3 },
+        { key: 'iso', label: 'ISO', value: photo.iso, icon: Camera },
+        { key: 'focal', label: 'Focal', value: photo.focalLength, icon: Camera },
       ].filter((row) => row.value),
     [photo],
   )
@@ -138,16 +138,20 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
   return (
     <div
       ref={overlayRef}
+      onClick={onClose}
       className="fixed inset-0 z-[60] bg-black/88 px-4 py-4 text-white backdrop-blur-sm md:px-6"
       role="dialog"
       aria-modal="true"
       aria-label={photo.alt}
     >
       <div className="lightbox-panel mx-auto flex h-full max-w-[1700px] flex-col">
-        <div className="relative min-h-0 flex-1 overflow-hidden rounded-md border border-white/10 bg-white/4">
+        <div className="relative min-h-0 flex-1 overflow-hidden bg-white/4">
           <button
             type="button"
-            onClick={onPrev}
+            onClick={(event) => {
+              event.stopPropagation()
+              onPrev()
+            }}
             className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-md border border-white/15 bg-black/30 p-2 text-white transition hover:border-white/30 hover:bg-black/50"
             aria-label="Previous photo"
           >
@@ -155,7 +159,10 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
           </button>
           <button
             type="button"
-            onClick={onNext}
+            onClick={(event) => {
+              event.stopPropagation()
+              onNext()
+            }}
             className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-md border border-white/15 bg-black/30 p-2 text-white transition hover:border-white/30 hover:bg-black/50"
             aria-label="Next photo"
           >
@@ -163,13 +170,39 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
           </button>
           <button
             type="button"
-            onClick={onClose}
+            onClick={(event) => {
+              event.stopPropagation()
+              onClose()
+            }}
             className="absolute right-3 top-3 z-10 rounded-md border border-white/15 bg-black/30 p-2 text-white transition hover:border-white/30 hover:bg-black/50"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
           </button>
           {isLoading ? <LoadingDial progress={loadProgress} className="absolute right-3 top-16 z-10" /> : null}
+          <div className="pointer-events-none absolute left-3 top-3 z-10 flex max-w-[320px] flex-col items-start gap-2 md:left-5 md:top-5">
+            {metaRows.map((row) => {
+              const Icon = row.icon
+              return (
+                <div key={row.key} className="lightbox-meta-row flex items-start gap-3 text-white/86">
+                  <Icon className="mt-[1px] h-4 w-4 shrink-0 text-white/54" />
+                  <div className="flex flex-col items-start gap-0.5">
+                    <span className="text-[11px] uppercase tracking-[0.14em] text-white/42">{row.label}</span>
+                    <span className="text-sm leading-5">
+                      {'isAperture' in row && row.isAperture ? (
+                        <>
+                          <span className="italic">f</span>
+                          <span className="ml-0.5">{row.value}</span>
+                        </>
+                      ) : (
+                        row.value
+                      )}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
           <img
             src={photo.placeholder || photo.src}
             alt=""
@@ -180,26 +213,29 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
             key={photo.id}
             src={assetURL || photo.placeholder || photo.src}
             alt={photo.alt}
+            onClick={(event) => event.stopPropagation()}
             className="relative z-[1] h-full w-full object-contain"
           />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/68 via-black/16 to-transparent px-3 pb-3 pt-16 md:px-5 md:pb-5">
-            <div className="flex flex-wrap gap-2">
-              {metaRows.map((row) => {
-                const Icon = row.icon
-                return (
-                  <div
-                    key={row.key}
-                    className="lightbox-meta-row inline-flex items-center gap-2 rounded-md border border-white/12 bg-black/36 px-3 py-2 text-sm text-white/84 backdrop-blur-md"
-                  >
-                    <Icon className="h-4 w-4 shrink-0 text-white/58" />
-                    <span>{row.value}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
         </div>
       </div>
     </div>
   )
+}
+
+function formatAperture(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return ''
+  }
+
+  const parts = trimmed.split('/')
+  if (parts.length === 2) {
+    const numerator = Number(parts[0])
+    const denominator = Number(parts[1])
+    if (Number.isFinite(numerator) && Number.isFinite(denominator) && denominator !== 0) {
+      return (numerator / denominator).toFixed(1).replace(/\.0$/, '')
+    }
+  }
+
+  return trimmed
 }

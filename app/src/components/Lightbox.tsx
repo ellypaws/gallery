@@ -158,7 +158,7 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
       [
         { key: 'camera', label: 'Camera', value: photo.camera, kind: 'camera' as const },
         { key: 'lens', label: 'Lens', value: photo.lens, kind: 'lens' as const },
-        { key: 'aperture', label: 'Aperture', value: formatAperture(photo.aperture), icon: Aperture, isAperture: true },
+        { key: 'aperture', label: 'Aperture', value: photo.aperture, icon: Aperture, isAperture: true },
         { key: 'shutter', label: 'Shutter', value: photo.shutter, icon: Clock3 },
         { key: 'iso', label: 'ISO', value: photo.iso, kind: 'iso' as const },
         { key: 'focal', label: 'Focal Length', value: photo.focalLength, icon: Search },
@@ -329,23 +329,6 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
   )
 }
 
-function formatAperture(value: string) {
-  const trimmed = value.trim()
-  if (!trimmed) {
-    return ''
-  }
-
-  const parts = trimmed.split('/')
-  if (parts.length === 2) {
-    const numerator = Number(parts[0])
-    const denominator = Number(parts[1])
-    if (Number.isFinite(numerator) && Number.isFinite(denominator) && denominator !== 0) {
-      return (numerator / denominator).toFixed(1).replace(/\.0$/, '')
-    }
-  }
-
-  return trimmed
-}
 
 function MetaIcon({ row }: { row: MetaRow }) {
   if (row.kind === 'iso') {

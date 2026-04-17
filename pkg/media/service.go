@@ -7,6 +7,7 @@ import (
 	"mime"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -74,6 +75,8 @@ func (s *Service) SyncLibrary(ctx context.Context) error {
 	s.syncMu.Lock()
 	defer s.syncMu.Unlock()
 
+	s.logger.Info("starting full library sync", "dir", s.cfg.MediaDir)
+
 	files := make([]string, 0, 64)
 	err := filepath.WalkDir(s.cfg.MediaDir, func(path string, d os.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -91,21 +94,37 @@ func (s *Service) SyncLibrary(ctx context.Context) error {
 		return err
 	}
 
+	s.logger.Info("discovered compatible files", "count", len(files))
+
 	sort.Strings(files)
 	seen := make([]uint, 0, len(files))
-	for _, path := range files {
+
+	type SyncResult struct {
+		path string
+		id   uint
+		err  error
+	}
+
+	pool := utils.NewWorkerPool(runtime.NumCPU(), func(path string) SyncResult {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return SyncResult{path: path, err: ctx.Err()}
 		default:
 		}
+		id, err := s.syncFile(path)
+		return SyncResult{path: path, id: id, err: err}
+	})
 
-		photoID, err := s.syncFile(path)
-		if err != nil {
-			s.logger.Error("photo sync failed", "path", path, "err", err)
+	go pool.AddAndClose(files...)
+
+	for res := range pool.Work() {
+		if res.err != nil {
+			if !errors.Is(res.err, context.Canceled) {
+				s.logger.Error("photo sync failed", "path", res.path, "err", res.err)
+			}
 			continue
 		}
-		seen = append(seen, photoID)
+		seen = append(seen, res.id)
 	}
 
 	query := s.db
@@ -118,6 +137,7 @@ func (s *Service) SyncLibrary(ctx context.Context) error {
 		return err
 	}
 
+	s.logger.Info("library sync completed successfully", "processed_count", len(seen))
 	return nil
 }
 
@@ -147,16 +167,20 @@ func (s *Service) syncFile(absPath string) (uint, error) {
 	}
 
 	if photo.ID != 0 && photo.Hash == hash && len(photo.Derivatives) > 0 {
+		s.logger.Debug("file already synced, skipping", "path", relPath, "hash", hash)
 		return photo.ID, nil
 	}
+
+	s.logger.Info("processing new image", "path", relPath, "hash", hash)
 
 	exifMeta, err := images.ExtractExif(absPath)
 	if err != nil {
 		s.logger.Warn("exif extraction failed", "path", absPath, "err", err)
 	}
 
-	processed, err := images.ProcessImage(absPath, s.cfg.CacheDir, hash)
+	processed, err := images.ProcessImage(absPath, s.cfg.CacheDir, hash, s.logger)
 	if err != nil {
+		s.logger.Error("failed to process image derivatives", "path", absPath, "err", err)
 		return 0, err
 	}
 
@@ -164,17 +188,17 @@ func (s *Service) syncFile(absPath string) (uint, error) {
 	_ = os.MkdirAll(scrubbedSubdir, 0o755)
 	scrubbedOriginal := filepath.Join(scrubbedSubdir, hash+".jpg")
 
-	if err := images.ScrubAndSaveJpeg(absPath, scrubbedOriginal, exifMeta); err != nil {
+	if err := images.ScrubAndSaveJpeg(absPath, scrubbedOriginal, exifMeta, s.logger); err != nil {
 		s.logger.Warn("failed to create scrubbed original", "path", absPath, "err", err)
 	}
 
 	for _, derivative := range processed.Derivatives {
 		dPath := filepath.Join(s.cfg.CacheDir, derivative.RelativePath)
-		_ = images.ScrubAndSaveJpeg(dPath, dPath, exifMeta)
+		_ = images.ScrubAndSaveJpeg(dPath, dPath, exifMeta, s.logger)
 	}
 	if processed.Placeholder != "" {
 		pPath := filepath.Join(s.cfg.CacheDir, processed.Placeholder)
-		_ = images.ScrubAndSaveJpeg(pPath, pPath, exifMeta)
+		_ = images.ScrubAndSaveJpeg(pPath, pPath, exifMeta, s.logger)
 	}
 
 	photo.RelativePath = relPath
@@ -189,6 +213,8 @@ func (s *Service) syncFile(absPath string) (uint, error) {
 	if exifMeta.CapturedAt != nil {
 		photo.TakenAt = exifMeta.CapturedAt
 	}
+
+	s.logger.Debug("saving photo metadata to database", "photo", relPath)
 
 	err = s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Save(&photo).Error; err != nil {
@@ -300,17 +326,24 @@ func (s *Service) UploadFiles(ctx context.Context, filenames []string) error {
 	s.syncMu.Lock()
 	defer s.syncMu.Unlock()
 
-	for _, name := range filenames {
+	pool := utils.NewWorkerPool(runtime.NumCPU(), func(name string) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
+		_, err := s.syncFile(filepath.Join(s.cfg.MediaDir, name))
+		return err
+	})
+	go pool.AddAndClose(filenames...)
 
-		if _, err := s.syncFile(filepath.Join(s.cfg.MediaDir, name)); err != nil {
-			return err
+	var firstErr error
+	for err := range pool.Work() {
+		if err != nil && firstErr == nil {
+			firstErr = err
 		}
 	}
+	s.logger.Info("upload complete", "count", len(filenames))
 	return nil
 }
 

@@ -13,14 +13,16 @@ import (
 	jpegstructure "github.com/dsoprea/go-jpeg-image-structure/v2"
 )
 
-func ScrubAndSaveJpeg(srcPath, dstPath string, meta ExifMetadata) error {
+func ScrubAndSaveJpeg(srcPath, dstPath string, meta ExifMetadata, logger *log.Logger) error {
 	jmp := jpegstructure.NewJpegMediaParser()
 	intfc, err := jmp.ParseFile(srcPath)
 	if err != nil {
+		logger.Debug("skipping EXIF scrubbing (not a JPEG or unparseable)", "path", srcPath)
 		return copyFile(srcPath, dstPath)
 	}
 	sl, ok := intfc.(*jpegstructure.SegmentList)
 	if !ok {
+		logger.Debug("skipping EXIF scrubbing (not segment payload)", "path", srcPath)
 		return copyFile(srcPath, dstPath)
 	}
 
@@ -70,7 +72,9 @@ func ScrubAndSaveJpeg(srcPath, dstPath string, meta ExifMetadata) error {
 
 	sl.DropExif()
 	if err := sl.SetExif(ib); err != nil {
-		log.Warn("failed to set scrubbed exif", "err", err)
+		logger.Warn("failed to set scrubbed exif", "err", err)
+	} else {
+		logger.Debug("successfully scrubbed and injected EXIF", "dst_path", dstPath)
 	}
 
 	dir := filepath.Dir(dstPath)

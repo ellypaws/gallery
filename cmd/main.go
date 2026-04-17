@@ -28,11 +28,15 @@ func main() {
 	}
 
 	mediaService := media.NewService(cfg, gormDB, logger)
-	if err := mediaService.SyncLibrary(context.Background()); err != nil {
-		logger.Error("initial media sync failed", "err", err)
-	}
 	watchCtx, watchCancel := context.WithCancel(context.Background())
 	defer watchCancel()
+
+	go func() {
+		if err := mediaService.SyncLibrary(watchCtx); err != nil {
+			logger.Error("initial media sync failed", "err", err)
+		}
+	}()
+
 	if err := mediaService.StartWatcher(watchCtx); err != nil {
 		logger.Error("media watcher failed to start", "err", err)
 	}

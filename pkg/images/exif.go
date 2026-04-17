@@ -3,6 +3,7 @@ package images
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -62,10 +63,10 @@ func ExtractExif(path string) (ExifMetadata, error) {
 		CameraMake:  strings.TrimSpace(makeValue),
 		CameraModel: strings.TrimSpace(modelValue),
 		LensModel:   sanitizeLens(lensValue),
-		Aperture:    strings.TrimSpace(apertureValue),
+		Aperture:    formatAperture(apertureValue),
 		Shutter:     strings.TrimSpace(shutterValue),
 		ISO:         strings.TrimSpace(isoValue),
-		FocalLength: strings.TrimSpace(focalValue),
+		FocalLength: formatFocalLength(focalValue),
 		CapturedAt:  captured,
 	}, nil
 }
@@ -122,4 +123,47 @@ func parseCapturedAt(values ...string) *time.Time {
 		}
 	}
 	return nil
+}
+
+func formatAperture(val string) string {
+	val = strings.TrimSpace(val)
+	if val == "" {
+		return ""
+	}
+	parts := strings.Split(val, "/")
+	if len(parts) == 2 {
+		num, err1 := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
+		den, err2 := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+		if err1 == nil && err2 == nil && den != 0 {
+			res := num / den
+			if res == float64(int(res)) {
+				return fmt.Sprintf("%d", int(res))
+			}
+			return fmt.Sprintf("%.1f", res)
+		}
+	}
+	return val
+}
+
+func formatFocalLength(val string) string {
+	val = strings.TrimSpace(val)
+	if val == "" {
+		return ""
+	}
+	parts := strings.Split(val, "/")
+	if len(parts) == 2 {
+		num, err1 := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
+		den, err2 := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+		if err1 == nil && err2 == nil && den != 0 {
+			res := num / den
+			if res == float64(int(res)) {
+				return fmt.Sprintf("%d mm", int(res))
+			}
+			return fmt.Sprintf("%.1f mm", res)
+		}
+	}
+	if !strings.HasSuffix(strings.ToLower(val), "mm") {
+		return val + " mm"
+	}
+	return val
 }

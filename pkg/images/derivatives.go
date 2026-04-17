@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/charmbracelet/log"
 	"github.com/disintegration/imaging"
 	"github.com/dlecorfec/progjpeg"
 )
@@ -34,18 +35,20 @@ type ProcessedImage struct {
 	Derivatives []GeneratedDerivative
 }
 
-func ProcessImage(srcPath, cacheDir, hash string) (ProcessedImage, error) {
+func ProcessImage(srcPath, cacheDir, hash string, logger *log.Logger) (ProcessedImage, error) {
 	info, err := os.Stat(srcPath)
 	if err != nil {
 		return ProcessedImage{}, err
 	}
 
+	logger.Debug("opening target image for derivation", "path", srcPath)
 	img, err := imaging.Open(srcPath, imaging.AutoOrientation(true))
 	if err != nil {
 		return ProcessedImage{}, err
 	}
 
 	bounds := img.Bounds()
+	logger.Debug("evaluated source boundaries", "width", bounds.Dx(), "height", bounds.Dy())
 	result := ProcessedImage{
 		Width:    bounds.Dx(),
 		Height:   bounds.Dy(),
@@ -59,6 +62,7 @@ func ProcessImage(srcPath, cacheDir, hash string) (ProcessedImage, error) {
 	}
 
 	for _, width := range widthsFor(bounds.Dx()) {
+		logger.Debug("generating responsive derivative", "target_width", width)
 		resized := imaging.Resize(img, width, 0, imaging.Lanczos)
 		relativePath := filepath.Join(hash[:2], hash[2:4], fmt.Sprintf("%s-w%d.jpg", hash, width))
 		outputPath := filepath.Join(cacheDir, relativePath)
@@ -82,6 +86,7 @@ func ProcessImage(srcPath, cacheDir, hash string) (ProcessedImage, error) {
 		})
 	}
 
+	logger.Debug("generating low-quality placeholder")
 	placeholderPath := filepath.Join(cacheDir, hash[:2], hash[2:4], fmt.Sprintf("%s-placeholder.jpg", hash))
 	placeholderRel := filepath.Join(hash[:2], hash[2:4], fmt.Sprintf("%s-placeholder.jpg", hash))
 	placeholder := imaging.Resize(img, 40, 0, imaging.Linear)

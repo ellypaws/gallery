@@ -149,49 +149,10 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
   }, [photo.width, photo.height, activeIndex])
 
   useEffect(() => {
-    let active = true
     setIsLoading(true)
-    setLoadingProgress(0)
-
+    setLoadingProgress(null) // Indeterminate fallback
     const sourceURL = photo.originalSrc || photo.src
-    const xhr = new XMLHttpRequest()
-    let objectURL = ''
-
-    xhr.open('GET', sourceURL, true)
-    xhr.responseType = 'blob'
-
-    xhr.onprogress = (e) => {
-      if (e.lengthComputable && active) {
-        setLoadingProgress(Math.round((e.loaded / e.total) * 100))
-      }
-    }
-
-    xhr.onload = () => {
-      if (!active) return
-      if (xhr.status === 200 || xhr.status === 304) {
-        objectURL = URL.createObjectURL(xhr.response)
-        setAssetURL(objectURL)
-      } else {
-        setAssetURL(sourceURL)
-      }
-      setLoadingProgress(100)
-    }
-
-    xhr.onerror = () => {
-      if (!active) return
-      setAssetURL(sourceURL)
-      setLoadingProgress(null)
-    }
-
-    xhr.send()
-
-    return () => {
-      active = false
-      xhr.abort()
-      if (objectURL) {
-        setTimeout(() => URL.revokeObjectURL(objectURL), 1000)
-      }
-    }
+    setAssetURL(sourceURL)
   }, [photo.id, photo.originalSrc, photo.src])
 
   const metaRows = useMemo(

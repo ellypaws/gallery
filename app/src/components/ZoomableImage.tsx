@@ -212,7 +212,7 @@ export function ZoomableImage({ src, alt, naturalWidth, naturalHeight, className
         onLoad={onLoad}
         onDragStart={(e) => e.preventDefault()}
         className="pointer-events-none relative z-[1] h-full w-full object-contain transition-opacity duration-300"
-        style={{ willChange: 'transform' }}
+        style={{ willChange: 'transform', imageOrientation: 'from-image' }}
       />
       
       <div 

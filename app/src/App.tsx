@@ -45,11 +45,6 @@ function App() {
         { autoAlpha: 0, y: 30 },
         { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' },
       )
-      gsap.fromTo(
-        '.gallery-card',
-        { autoAlpha: 0, y: 24 },
-        { autoAlpha: 1, y: 0, stagger: 0.04, duration: 0.35, delay: 0.12, ease: 'power2.out' },
-      )
     }, shellRef)
 
     return () => ctx.revert()
@@ -81,7 +76,7 @@ function App() {
 
       <main className="px-4 pb-8 pt-4 md:px-8 md:pt-6">
         <section className="mx-auto max-w-[1540px]">
-          <h1 className="hero-copy pointer-events-none font-teko text-[144px] max-xl:text-[120px] max-lg:text-[96px] max-md:text-[72px] max-sm:text-[56px] font-bold text-[var(--hero-title)] tracking-[0em] leading-[118.8px] max-md:leading-[0.9] -mb-[54px] max-md:-mb-[10px] drop-shadow-sm text-left antialiased block w-full max-w-[945px] break-words relative z-20 -rotate-2 origin-left">
+          <h1 className="hero-copy pointer-events-none font-teko text-[288px] max-xl:text-[220px] max-lg:text-[160px] max-md:text-[120px] max-sm:text-[96px] font-bold text-[var(--hero-title)] tracking-tight leading-[0.8] -mb-[80px] max-md:-mb-[30px] drop-shadow-sm text-left antialiased block w-full max-w-[1200px] break-words relative z-20 -rotate-2 origin-left">
             Elly
           </h1>
         </section>

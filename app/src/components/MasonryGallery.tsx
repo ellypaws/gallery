@@ -181,7 +181,7 @@ function GalleryCard({
     const el = wrapperRef.current
     if (!el) return
 
-    gsap.set(el, { autoAlpha: 0, y: 40 })
+    gsap.set(el, { autoAlpha: 0, y: 60 })
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -189,13 +189,13 @@ function GalleryCard({
           gsap.to(el, {
             autoAlpha: 1,
             y: 0,
-            duration: 0.6,
+            duration: 0.7,
             ease: 'power3.out',
           })
           observer.disconnect()
         }
       },
-      { rootMargin: '0px 0px -50px 0px', threshold: 0 }
+      { rootMargin: '0px 0px -150px 0px', threshold: 0.1 }
     )
 
     observer.observe(el)

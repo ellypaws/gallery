@@ -29,6 +29,7 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
   const photo = photos[activeIndex]
   const [assetURL, setAssetURL] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+  const [loadingProgress, setLoadingProgress] = useState<number | null>(null)
   const [metaStyle, setMetaStyle] = useState({ maxHeight: 1000, opacity: 1, maskImage: 'none' })
 
   const imgContainerRef = useRef<HTMLDivElement>(null)
@@ -148,9 +149,49 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
   }, [photo.width, photo.height, activeIndex])
 
   useEffect(() => {
+    let active = true
     setIsLoading(true)
+    setLoadingProgress(0)
+
     const sourceURL = photo.originalSrc || photo.src
-    setAssetURL(sourceURL)
+    const xhr = new XMLHttpRequest()
+    let objectURL = ''
+
+    xhr.open('GET', sourceURL, true)
+    xhr.responseType = 'blob'
+
+    xhr.onprogress = (e) => {
+      if (e.lengthComputable && active) {
+        setLoadingProgress(Math.round((e.loaded / e.total) * 100))
+      }
+    }
+
+    xhr.onload = () => {
+      if (!active) return
+      if (xhr.status === 200 || xhr.status === 304) {
+        objectURL = URL.createObjectURL(xhr.response)
+        setAssetURL(objectURL)
+      } else {
+        setAssetURL(sourceURL)
+      }
+      setLoadingProgress(100)
+    }
+
+    xhr.onerror = () => {
+      if (!active) return
+      setAssetURL(sourceURL)
+      setLoadingProgress(null)
+    }
+
+    xhr.send()
+
+    return () => {
+      active = false
+      xhr.abort()
+      if (objectURL) {
+        setTimeout(() => URL.revokeObjectURL(objectURL), 1000)
+      }
+    }
   }, [photo.id, photo.originalSrc, photo.src])
 
   const metaRows = useMemo(
@@ -279,7 +320,7 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
             >
               <X className="h-4 w-4" />
             </button>
-            {isLoading ? <LoadingDial className="absolute right-3 top-16 z-10" /> : null}
+            {isLoading ? <LoadingDial className="absolute right-3 top-16 z-10 drop-shadow-md" progress={loadingProgress} /> : null}
 
             <div
               ref={mobileMetaRef}

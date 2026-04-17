@@ -59,11 +59,19 @@ func ExtractExif(path string) (ExifMetadata, error) {
 	isoValue := firstWithFallback(exifIfd, "PhotographicSensitivity", "ISOSpeedRatings")
 	focalValue := firstWithFallback(exifIfd, "FocalLength")
 	captured := parseCapturedAt(firstWithFallback(exifIfd, "DateTimeOriginal", "DateTimeDigitized"), firstWithFallback(root, "DateTime"))
-	orientationValue := firstWithFallback(root, "Orientation")
-
 	var orientation uint16 = 1
-	if val, err := strconv.ParseUint(orientationValue, 10, 16); err == nil {
-		orientation = uint16(val)
+	if rawVal, err := rawFirstValue(root, "Orientation"); err == nil {
+		if vals, ok := rawVal.([]uint16); ok && len(vals) > 0 {
+			orientation = vals[0]
+		} else if vals, ok := rawVal.([]uint8); ok && len(vals) > 0 {
+			orientation = uint16(vals[0])
+		} else if valStr := fmt.Sprint(rawVal); valStr != "" {
+			// Failsafe string parse if scalar
+			valStr = strings.TrimLeft(strings.TrimRight(valStr, "]"), "[")
+			if val, err := strconv.ParseUint(valStr, 10, 16); err == nil {
+				orientation = uint16(val)
+			}
+		}
 	}
 
 	return ExifMetadata{
@@ -117,6 +125,19 @@ func firstFormatted(ifd *exif.Ifd, name string) (string, error) {
 	}
 
 	return fmt.Sprint(value), nil
+}
+
+func rawFirstValue(ifd *exif.Ifd, name string) (interface{}, error) {
+	if ifd == nil {
+		return nil, errors.New("missing ifd")
+	}
+
+	results, err := ifd.FindTagWithName(name)
+	if err != nil || len(results) == 0 {
+		return nil, fmt.Errorf("tag %s not found", name)
+	}
+
+	return results[0].Value()
 }
 
 func parseCapturedAt(values ...string) *time.Time {

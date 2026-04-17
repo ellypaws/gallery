@@ -200,13 +200,16 @@ func (s *Service) syncFile(absPath string) (uint, error) {
 		s.logger.Warn("failed to create scrubbed original", "path", absPath, "err", err)
 	}
 
+	normalizedExif := exifMeta
+	normalizedExif.Orientation = 1
+
 	for _, derivative := range processed.Derivatives {
 		dPath := filepath.Join(s.cfg.CacheDir, derivative.RelativePath)
-		_ = images.ScrubAndSaveJpeg(dPath, dPath, exifMeta, s.logger)
+		_ = images.ScrubAndSaveJpeg(dPath, dPath, normalizedExif, s.logger)
 	}
 	if processed.Placeholder != "" {
 		pPath := filepath.Join(s.cfg.CacheDir, processed.Placeholder)
-		_ = images.ScrubAndSaveJpeg(pPath, pPath, exifMeta, s.logger)
+		_ = images.ScrubAndSaveJpeg(pPath, pPath, normalizedExif, s.logger)
 	}
 
 	photo.RelativePath = relPath

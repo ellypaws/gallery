@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { useWindowVirtualizer } from '@tanstack/react-virtual'
+import { useWindowVirtualizer, type VirtualItem } from '@tanstack/react-virtual'
+import { gsap } from 'gsap'
 
 import type { GalleryItem } from '../lib/types'
 
@@ -126,42 +127,100 @@ function VirtualColumn({
           }
 
           return (
-            <div
+            <GalleryCard
               key={virtualItem.key}
-              ref={virtualizer.measureElement}
-              data-index={virtualItem.index}
-              className="gallery-card absolute left-0 w-full"
-              style={{
-                transform: `translateY(${virtualItem.start - virtualizer.options.scrollMargin}px)`,
-                paddingBottom: `${gap}px`,
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => onOpen(entry.index)}
-                className="block w-full overflow-hidden text-left transition duration-300 hover:-translate-y-1"
-              >
-                <div
-                  className="relative overflow-hidden"
-                  style={{
-                    aspectRatio: `${entry.photo.width} / ${entry.photo.height}`,
-                  }}
-                >
-                  <img
-                    src={entry.photo.src}
-                    srcSet={entry.photo.srcSet}
-                    sizes={entry.photo.sizes}
-                    alt={entry.photo.alt}
-                    loading="lazy"
-                    decoding="async"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-              </button>
-            </div>
+              virtualItem={virtualItem}
+              entry={entry}
+              gap={gap}
+              scrollMargin={virtualizer.options.scrollMargin}
+              onOpen={onOpen}
+              measureElement={virtualizer.measureElement}
+            />
           )
         })}
       </div>
+    </div>
+  )
+}
+
+function GalleryCard({
+  virtualItem,
+  entry,
+  gap,
+  scrollMargin,
+  onOpen,
+  measureElement,
+}: {
+  virtualItem: VirtualItem
+  entry: MasonryEntry
+  gap: number
+  scrollMargin: number
+  onOpen: (index: number) => void
+  measureElement: (node: Element | null) => void
+}) {
+  const cardRef = useRef<HTMLDivElement | null>(null)
+
+  useLayoutEffect(() => {
+    const el = cardRef.current
+    if (!el) return
+
+    gsap.set(el, { autoAlpha: 0, y: 40 })
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          gsap.to(el, {
+            autoAlpha: 1,
+            y: 0,
+            duration: 0.6,
+            ease: 'power3.out',
+          })
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '0px 0px -50px 0px', threshold: 0 }
+    )
+
+    observer.observe(el)
+
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div
+      ref={(el) => {
+        cardRef.current = el
+        measureElement(el)
+      }}
+      data-index={virtualItem.index}
+      className="gallery-card absolute left-0 w-full"
+      style={{
+        transform: `translateY(${virtualItem.start - scrollMargin}px)`,
+        paddingBottom: `${gap}px`,
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => onOpen(entry.index)}
+        className="block w-full overflow-hidden text-left transition duration-300 hover:-translate-y-1"
+      >
+        <div
+          className="relative overflow-hidden"
+          style={{
+            aspectRatio: `${entry.photo.width} / ${entry.photo.height}`,
+          }}
+        >
+          <img
+            src={entry.photo.src}
+            srcSet={entry.photo.srcSet}
+            sizes={entry.photo.sizes}
+            alt={entry.photo.alt}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
+        </div>
+      </button>
     </div>
   )
 }

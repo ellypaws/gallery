@@ -61,13 +61,21 @@ func ExtractExif(path string) (ExifMetadata, error) {
 	return ExifMetadata{
 		CameraMake:  strings.TrimSpace(makeValue),
 		CameraModel: strings.TrimSpace(modelValue),
-		LensModel:   strings.TrimSpace(lensValue),
+		LensModel:   sanitizeLens(lensValue),
 		Aperture:    strings.TrimSpace(apertureValue),
 		Shutter:     strings.TrimSpace(shutterValue),
 		ISO:         strings.TrimSpace(isoValue),
 		FocalLength: strings.TrimSpace(focalValue),
 		CapturedAt:  captured,
 	}, nil
+}
+
+func sanitizeLens(val string) string {
+	val = strings.TrimSpace(val)
+	if strings.Trim(val, "-_ \x00\t\n\r") == "" {
+		return "Unknown"
+	}
+	return val
 }
 
 func firstWithFallback(ifd *exif.Ifd, names ...string) string {

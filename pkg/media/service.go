@@ -335,6 +335,11 @@ func (s *Service) toGalleryItem(photo models.Photo) GalleryItem {
 		alt = title
 	}
 
+	lensModel := strings.TrimSpace(photo.Exif.LensModel)
+	if strings.Trim(lensModel, "-_ \x00\t\n\r") == "" {
+		lensModel = "Unknown"
+	}
+
 	return GalleryItem{
 		ID:           photo.ID,
 		Title:        title,
@@ -348,7 +353,7 @@ func (s *Service) toGalleryItem(photo models.Photo) GalleryItem {
 		SrcSet:       buildSrcSet(s.cfg, photo.Derivatives),
 		Sizes:        "(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw",
 		Camera:       strings.TrimSpace(strings.TrimSpace(photo.Exif.CameraMake + " " + photo.Exif.CameraModel)),
-		Lens:         photo.Exif.LensModel,
+		Lens:         lensModel,
 		Aperture:     photo.Exif.Aperture,
 		Shutter:      photo.Exif.Shutter,
 		ISO:          photo.Exif.ISO,

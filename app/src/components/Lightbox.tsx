@@ -97,7 +97,7 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
       />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_18%,rgba(0,0,0,0.32)_56%,rgba(0,0,0,0.84)_100%)]" />
 
-      <aside className="pointer-events-none absolute left-5 top-1/2 z-10 hidden w-[248px] -translate-y-1/2 md:flex md:flex-col">
+      <aside className="pointer-events-none absolute left-5 bottom-8 z-10 hidden w-[248px] md:flex md:flex-col">
         <div className="flex flex-col items-start gap-3">
           {metaRows.map((row) => (
             <div key={row.key} className="lightbox-meta-row flex items-start gap-3 text-white/86">

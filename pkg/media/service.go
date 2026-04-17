@@ -52,6 +52,7 @@ type GalleryItem struct {
 	ISO          string     `json:"iso"`
 	FocalLength  string     `json:"focalLength"`
 	CapturedAt   *time.Time `json:"capturedAt"`
+	UpdatedAt    time.Time  `json:"updatedAt"`
 	SortOrder    int        `json:"sortOrder"`
 	Hidden       bool       `json:"hidden"`
 	RelativePath string     `json:"relativePath"`
@@ -252,10 +253,24 @@ func (s *Service) Gallery(ctx context.Context) (GalleryResponse, error) {
 	}
 
 	sort.SliceStable(items, func(i, j int) bool {
-		if items[i].SortOrder == items[j].SortOrder {
-			return items[i].ID < items[j].ID
+		if items[i].SortOrder != items[j].SortOrder {
+			return items[i].SortOrder < items[j].SortOrder
 		}
-		return items[i].SortOrder < items[j].SortOrder
+
+		timeI := items[i].UpdatedAt
+		if items[i].CapturedAt != nil {
+			timeI = *items[i].CapturedAt
+		}
+
+		timeJ := items[j].UpdatedAt
+		if items[j].CapturedAt != nil {
+			timeJ = *items[j].CapturedAt
+		}
+
+		if !timeI.Equal(timeJ) {
+			return timeI.After(timeJ)
+		}
+		return items[i].ID > items[j].ID
 	})
 
 	return GalleryResponse{
@@ -339,6 +354,7 @@ func (s *Service) toGalleryItem(photo models.Photo) GalleryItem {
 		ISO:          photo.Exif.ISO,
 		FocalLength:  photo.Exif.FocalLength,
 		CapturedAt:   photo.Exif.CapturedAt,
+		UpdatedAt:    photo.UpdatedAt,
 		SortOrder:    photo.Override.SortOrder,
 		Hidden:       photo.Override.Hidden,
 		RelativePath: photo.RelativePath,

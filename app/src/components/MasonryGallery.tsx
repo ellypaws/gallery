@@ -158,10 +158,10 @@ function GalleryCard({
   onOpen: (index: number) => void
   measureElement: (node: Element | null) => void
 }) {
-  const cardRef = useRef<HTMLDivElement | null>(null)
+  const wrapperRef = useRef<HTMLDivElement | null>(null)
 
   useLayoutEffect(() => {
-    const el = cardRef.current
+    const el = wrapperRef.current
     if (!el) return
 
     gsap.set(el, { autoAlpha: 0, y: 40 })
@@ -188,39 +188,38 @@ function GalleryCard({
 
   return (
     <div
-      ref={(el) => {
-        cardRef.current = el
-        measureElement(el)
-      }}
+      ref={measureElement}
       data-index={virtualItem.index}
-      className="gallery-card absolute left-0 w-full"
+      className="absolute left-0 w-full"
       style={{
         transform: `translateY(${virtualItem.start - scrollMargin}px)`,
         paddingBottom: `${gap}px`,
       }}
     >
-      <button
-        type="button"
-        onClick={() => onOpen(entry.index)}
-        className="block w-full overflow-hidden text-left transition duration-300 hover:-translate-y-1"
-      >
-        <div
-          className="relative overflow-hidden"
-          style={{
-            aspectRatio: `${entry.photo.width} / ${entry.photo.height}`,
-          }}
+      <div ref={wrapperRef} className="gallery-card w-full">
+        <button
+          type="button"
+          onClick={() => onOpen(entry.index)}
+          className="block w-full overflow-hidden text-left transition duration-300 hover:-translate-y-1"
         >
-          <img
-            src={entry.photo.src}
-            srcSet={entry.photo.srcSet}
-            sizes={entry.photo.sizes}
-            alt={entry.photo.alt}
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover"
-          />
-        </div>
-      </button>
+          <div
+            className="relative overflow-hidden"
+            style={{
+              aspectRatio: `${entry.photo.width} / ${entry.photo.height}`,
+            }}
+          >
+            <img
+              src={entry.photo.src}
+              srcSet={entry.photo.srcSet}
+              sizes={entry.photo.sizes}
+              alt={entry.photo.alt}
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-cover"
+            />
+          </div>
+        </button>
+      </div>
     </div>
   )
 }

@@ -28,6 +28,11 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
   const photo = photos[activeIndex]
   const [assetURL, setAssetURL] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+  const [metaStyle, setMetaStyle] = useState({ maxHeight: 1000, opacity: 1, maskImage: 'none' })
+
+  const imgContainerRef = useRef<HTMLDivElement>(null)
+  const mobileMetaRef = useRef<HTMLDivElement>(null)
+  const desktopMetaRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -67,6 +72,71 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
   }, [activeIndex])
 
   useEffect(() => {
+    function updateLayout() {
+      if (!imgContainerRef.current) return
+      const rect = imgContainerRef.current.getBoundingClientRect()
+      const W = rect.width
+      const H = rect.height
+      if (W === 0 || H === 0) return
+
+      const imgRatio = photo.width / photo.height
+      const containerRatio = W / H
+
+      let imgW, imgH
+      if (imgRatio > containerRatio) {
+        imgW = W
+        imgH = W / imgRatio
+      } else {
+        imgH = H
+        imgW = H * imgRatio
+      }
+
+      const spaceLeftInContainer = (W - imgW) / 2
+      const spaceBottomInContainer = (H - imgH) / 2
+
+      const imgLeftAbsolute = rect.left + spaceLeftInContainer
+      const imgBottomAbsolute = window.innerHeight - rect.bottom + spaceBottomInContainer
+
+      const isMobile = window.innerWidth < 768
+
+      let computedMaxHeight = 0
+      if (isMobile) {
+        computedMaxHeight = imgBottomAbsolute - 20 // placed at bottom-5 (20px)
+      } else {
+        if (imgLeftAbsolute > 288) {
+          computedMaxHeight = window.innerHeight - 64 // placed at bottom-8 (32px), with 32px top padding
+        } else {
+          computedMaxHeight = imgBottomAbsolute - 32
+        }
+      }
+
+      const safeMaxHeight = Math.floor(Math.max(0, computedMaxHeight))
+
+      let contentHeight = 0
+      if (isMobile && mobileMetaRef.current) {
+        contentHeight = mobileMetaRef.current.scrollHeight
+      } else if (!isMobile && desktopMetaRef.current) {
+        contentHeight = desktopMetaRef.current.scrollHeight
+      }
+
+      let mask = 'none'
+      if (contentHeight > 0 && safeMaxHeight < contentHeight) {
+        mask = 'linear-gradient(to bottom, black calc(100% - 30px), transparent 100%)'
+      }
+
+      setMetaStyle({
+        maxHeight: safeMaxHeight,
+        opacity: safeMaxHeight < 40 ? 0 : 1,
+        maskImage: mask,
+      })
+    }
+
+    updateLayout()
+    window.addEventListener('resize', updateLayout)
+    return () => window.removeEventListener('resize', updateLayout)
+  }, [photo.width, photo.height, activeIndex])
+
+  useEffect(() => {
     setIsLoading(true)
     const sourceURL = photo.originalSrc || photo.src
     setAssetURL(sourceURL)
@@ -102,10 +172,19 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
       />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_18%,rgba(0,0,0,0.32)_56%,rgba(0,0,0,0.84)_100%)]" />
 
-      <aside className="pointer-events-none absolute left-5 bottom-8 z-10 hidden w-[248px] md:flex md:flex-col">
+      <aside
+        ref={desktopMetaRef}
+        className="pointer-events-none absolute left-5 bottom-8 z-10 hidden w-[248px] overflow-hidden transition-opacity duration-300 md:flex md:flex-col"
+        style={{
+          maxHeight: metaStyle.maxHeight,
+          opacity: metaStyle.opacity,
+          maskImage: metaStyle.maskImage,
+          WebkitMaskImage: metaStyle.maskImage,
+        }}
+      >
         <div className="flex flex-col items-start gap-3">
           {metaRows.map((row) => (
-            <div key={row.key} className="lightbox-meta-row flex items-start gap-3 text-white/86">
+            <div key={row.key} className="lightbox-meta-row flex shrink-0 items-start gap-3 text-white/86">
               <MetaIcon row={row} />
               <div className="flex flex-col items-start gap-0.5">
                 <span className="text-[11px] uppercase tracking-[0.14em] text-white/42">{row.label}</span>
@@ -163,9 +242,18 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
             </button>
             {isLoading ? <LoadingDial className="absolute right-3 top-16 z-10" /> : null}
 
-            <div className="pointer-events-none absolute left-3 top-3 z-10 flex max-w-[280px] flex-col items-start gap-2 md:hidden">
+            <div
+              ref={mobileMetaRef}
+              className="pointer-events-none fixed bottom-5 left-4 z-10 flex w-[280px] flex-col items-start gap-2 overflow-hidden transition-opacity duration-300 md:hidden"
+              style={{
+                maxHeight: metaStyle.maxHeight,
+                opacity: metaStyle.opacity,
+                maskImage: metaStyle.maskImage,
+                WebkitMaskImage: metaStyle.maskImage,
+              }}
+            >
               {metaRows.map((row) => (
-                <div key={row.key} className="lightbox-meta-row flex items-start gap-3 text-white/86">
+                <div key={row.key} className="lightbox-meta-row flex shrink-0 items-start gap-3 text-white/86">
                   <MetaIcon row={row} />
                   <div className="flex flex-col items-start gap-0.5">
                     <span className="text-[11px] uppercase tracking-[0.14em] text-white/42">{row.label}</span>
@@ -184,14 +272,16 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
               ))}
             </div>
 
-            <img
-              key={photo.id}
-              src={assetURL || photo.placeholder || photo.src}
-              alt={photo.alt}
-              onLoad={() => setIsLoading(false)}
-              onClick={(event) => event.stopPropagation()}
-              className={`relative z-[1] h-full w-full object-contain transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
-            />
+            <div ref={imgContainerRef} className="relative h-full w-full">
+              <img
+                key={photo.id}
+                src={assetURL || photo.placeholder || photo.src}
+                alt={photo.alt}
+                onLoad={() => setIsLoading(false)}
+                onClick={(event) => event.stopPropagation()}
+                className={`relative z-[1] h-full w-full object-contain transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+              />
+            </div>
           </div>
         </div>
       </div>

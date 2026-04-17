@@ -34,11 +34,20 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
   const mobileMetaRef = useRef<HTMLDivElement>(null)
   const desktopMetaRef = useRef<HTMLElement>(null)
 
+  const slideDirectionRef = useRef<number>(1)
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
-      if (event.key === 'ArrowLeft') onPrev()
-      if (event.key === 'ArrowRight') onNext()
+      if (event.key === 'ArrowLeft') {
+        slideDirectionRef.current = -1
+        onPrev()
+      }
+      if (event.key === 'ArrowRight') {
+        slideDirectionRef.current = 1
+        onNext()
+      }
     }
 
     window.addEventListener('keydown', onKeyDown)
@@ -55,16 +64,17 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
       return
     }
 
+    const dir = slideDirectionRef.current
     const ctx = gsap.context(() => {
       gsap.fromTo(
         '.lightbox-panel',
-        { autoAlpha: 0, y: 24, scale: 0.98 },
-        { autoAlpha: 1, y: 0, scale: 1, duration: 0.35, ease: 'power3.out' },
+        { autoAlpha: 0, x: dir * 40, scale: 0.98 },
+        { autoAlpha: 1, x: 0, scale: 1, duration: 0.35, ease: 'power3.out' },
       )
       gsap.fromTo(
         '.lightbox-meta-row',
-        { autoAlpha: 0, y: 10 },
-        { autoAlpha: 1, y: 0, duration: 0.28, stagger: 0.04, delay: 0.1, ease: 'power2.out' },
+        { autoAlpha: 0, x: dir * 10 },
+        { autoAlpha: 1, x: 0, duration: 0.28, stagger: 0.04, delay: 0.1, ease: 'power2.out' },
       )
     }, overlayRef)
 
@@ -155,10 +165,36 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
     [photo],
   )
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartRef.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+    }
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStartRef.current) return
+    const dx = e.changedTouches[0].clientX - touchStartRef.current.x
+    const dy = e.changedTouches[0].clientY - touchStartRef.current.y
+    touchStartRef.current = null
+
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+      if (dx < 0) {
+        slideDirectionRef.current = 1
+        onNext()
+      } else {
+        slideDirectionRef.current = -1
+        onPrev()
+      }
+    }
+  }
+
   return (
     <div
       ref={overlayRef}
       onClick={onClose}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
       className="fixed inset-0 z-[60] bg-black/88 px-4 py-4 text-white backdrop-blur-sm md:px-6"
       role="dialog"
       aria-modal="true"
@@ -211,6 +247,7 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
               type="button"
               onClick={(event) => {
                 event.stopPropagation()
+                slideDirectionRef.current = -1
                 onPrev()
               }}
               className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-md border border-white/15 bg-black/30 p-2 text-white transition hover:border-white/30 hover:bg-black/50"
@@ -222,6 +259,7 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
               type="button"
               onClick={(event) => {
                 event.stopPropagation()
+                slideDirectionRef.current = 1
                 onNext()
               }}
               className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-md border border-white/15 bg-black/30 p-2 text-white transition hover:border-white/30 hover:bg-black/50"

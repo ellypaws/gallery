@@ -20,6 +20,7 @@ type ExifMetadata struct {
 	ISO         string
 	FocalLength string
 	CapturedAt  *time.Time
+	Orientation uint16
 }
 
 func ExtractExif(path string) (ExifMetadata, error) {
@@ -58,6 +59,12 @@ func ExtractExif(path string) (ExifMetadata, error) {
 	isoValue := firstWithFallback(exifIfd, "PhotographicSensitivity", "ISOSpeedRatings")
 	focalValue := firstWithFallback(exifIfd, "FocalLength")
 	captured := parseCapturedAt(firstWithFallback(exifIfd, "DateTimeOriginal", "DateTimeDigitized"), firstWithFallback(root, "DateTime"))
+	orientationValue := firstWithFallback(root, "Orientation")
+
+	var orientation uint16 = 1
+	if val, err := strconv.ParseUint(orientationValue, 10, 16); err == nil {
+		orientation = uint16(val)
+	}
 
 	return ExifMetadata{
 		CameraMake:  strings.TrimSpace(makeValue),
@@ -68,6 +75,7 @@ func ExtractExif(path string) (ExifMetadata, error) {
 		ISO:         strings.TrimSpace(isoValue),
 		FocalLength: formatFocalLength(focalValue),
 		CapturedAt:  captured,
+		Orientation: orientation,
 	}, nil
 }
 

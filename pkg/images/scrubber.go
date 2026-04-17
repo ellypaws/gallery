@@ -40,6 +40,9 @@ func ScrubAndSaveJpeg(srcPath, dstPath string, meta ExifMetadata, logger *log.Lo
 	if meta.CameraModel != "" {
 		_ = ib.AddStandardWithName("Model", meta.CameraModel)
 	}
+	if meta.Orientation != 0 {
+		_ = ib.AddStandardWithName("Orientation", []uint16{meta.Orientation})
+	}
 	if meta.CapturedAt != nil {
 		_ = ib.AddStandardWithName("DateTime", meta.CapturedAt.Format("2006:01:02 15:04:05"))
 	}

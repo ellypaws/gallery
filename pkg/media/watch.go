@@ -31,10 +31,14 @@ func (s *Service) runWatcher(ctx context.Context, watcher *fsnotify.Watcher) {
 	if !debounce.Stop() {
 		<-debounce.C
 	}
-	pending := false
 
-	trigger := func() {
-		pending = true
+	pendingFiles := make(map[string]struct{})
+
+	trigger := func(path string) {
+		// Convert absolute path to relative filename so UploadFiles can process it directly
+		if rel, err := filepath.Rel(s.cfg.MediaDir, path); err == nil {
+			pendingFiles[rel] = struct{}{}
+		}
 		debounce.Reset(450 * time.Millisecond)
 	}
 
@@ -53,23 +57,29 @@ func (s *Service) runWatcher(ctx context.Context, watcher *fsnotify.Watcher) {
 
 			if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
 				_ = s.addWatchTree(watcher, event.Name)
+			} else {
+				trigger(event.Name)
 			}
-
-			trigger()
 		case err, ok := <-watcher.Errors:
 			if !ok {
 				return
 			}
 			s.logger.Warn("media watcher error", "err", err)
 		case <-debounce.C:
-			if !pending {
+			if len(pendingFiles) == 0 {
 				continue
 			}
-			pending = false
-			if err := s.SyncLibrary(context.Background()); err != nil {
-				s.logger.Error("media watcher sync failed", "err", err)
+
+			filesToUpload := make([]string, 0, len(pendingFiles))
+			for file := range pendingFiles {
+				filesToUpload = append(filesToUpload, file)
+			}
+			pendingFiles = make(map[string]struct{})
+
+			if err := s.UploadFiles(context.Background(), filesToUpload); err != nil {
+				s.logger.Error("media watcher partial sync failed", "err", err)
 			} else {
-				s.logger.Debug("media watcher sync complete")
+				s.logger.Debug("media watcher partial sync complete", "files", len(filesToUpload))
 			}
 		}
 	}

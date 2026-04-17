@@ -27,6 +27,7 @@ type Service struct {
 	db     *gorm.DB
 	logger *log.Logger
 	syncMu sync.Mutex
+	dbMu   sync.RWMutex
 }
 
 type GalleryResponse struct {
@@ -127,14 +128,18 @@ func (s *Service) SyncLibrary(ctx context.Context) error {
 		seen = append(seen, res.id)
 	}
 
+	s.dbMu.Lock()
 	query := s.db
 	if len(seen) > 0 {
 		query = query.Where("id NOT IN ?", seen)
 	} else {
 		query = query.Session(&gorm.Session{AllowGlobalUpdate: true})
 	}
-	if err := query.Delete(&models.Photo{}).Error; err != nil {
-		return err
+	errDelete := query.Delete(&models.Photo{}).Error
+	s.dbMu.Unlock()
+
+	if errDelete != nil {
+		return errDelete
 	}
 
 	s.logger.Info("library sync completed successfully", "processed_count", len(seen))
@@ -159,9 +164,12 @@ func (s *Service) syncFile(absPath string) (uint, error) {
 	}
 
 	var photo models.Photo
+	s.dbMu.RLock()
 	err = s.db.Preload("Override").Preload("Exif").Preload("Derivatives").
 		Where("relative_path = ?", relPath).
 		First(&photo).Error
+	s.dbMu.RUnlock()
+
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, err
 	}
@@ -216,6 +224,7 @@ func (s *Service) syncFile(absPath string) (uint, error) {
 
 	s.logger.Debug("saving photo metadata to database", "photo", relPath)
 
+	s.dbMu.Lock()
 	err = s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Save(&photo).Error; err != nil {
 			return err
@@ -267,6 +276,8 @@ func (s *Service) syncFile(absPath string) (uint, error) {
 
 		return nil
 	})
+	s.dbMu.Unlock()
+
 	if err != nil {
 		return 0, err
 	}
@@ -276,12 +287,16 @@ func (s *Service) syncFile(absPath string) (uint, error) {
 
 func (s *Service) Gallery(ctx context.Context) (GalleryResponse, error) {
 	var photos []models.Photo
+
+	s.dbMu.RLock()
 	err := s.db.WithContext(ctx).
 		Preload("Exif").
 		Preload("Override").
 		Preload("Derivatives").
 		Order("id asc").
 		Find(&photos).Error
+	s.dbMu.RUnlock()
+
 	if err != nil {
 		return GalleryResponse{}, err
 	}
@@ -348,6 +363,9 @@ func (s *Service) UploadFiles(ctx context.Context, filenames []string) error {
 }
 
 func (s *Service) UpdateOverride(ctx context.Context, photoID uint, input PhotoOverrideInput) error {
+	s.dbMu.Lock()
+	defer s.dbMu.Unlock()
+
 	var photo models.Photo
 	if err := s.db.WithContext(ctx).Preload("Override").First(&photo, photoID).Error; err != nil {
 		return err

@@ -151,10 +151,10 @@ function App() {
             <div className="min-h-[60vh]" />
           ) : (
             <div className="flex flex-col gap-12">
-              {groupedPhotos.map((group) => (
+              {groupedPhotos.map((group, index) => (
                 <div key={group.label} className="w-full">
                   {group.label && (
-                    <h2 className="mb-6 font-teko text-3xl font-medium tracking-wide text-[var(--text)] opacity-80 md:text-4xl">
+                    <h2 className={`mb-6 font-teko text-3xl font-medium tracking-wide text-[var(--text)] opacity-80 md:text-4xl ${index === 0 ? 'text-right' : ''}`}>
                       {group.label}
                     </h2>
                   )}

@@ -37,7 +37,12 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
     }
 
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    document.body.style.overflow = 'hidden'
+    
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = ''
+    }
   }, [onClose, onNext, onPrev])
 
   useEffect(() => {

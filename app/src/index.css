@@ -35,6 +35,8 @@ html,
 body,
 #root {
   min-height: 100%;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 * {
@@ -60,6 +62,12 @@ button,
 input,
 textarea {
   font: inherit;
+}
+
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 img {

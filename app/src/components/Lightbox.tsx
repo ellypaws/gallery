@@ -5,6 +5,7 @@ import type { LucideIcon } from 'lucide-react'
 
 import type { GalleryItem } from '../lib/types'
 import { LoadingDial } from './LoadingDial'
+import { ZoomableImage } from './ZoomableImage'
 
 type LightboxProps = {
   photos: GalleryItem[]
@@ -311,13 +312,14 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
             </div>
 
             <div ref={imgContainerRef} className="relative h-full w-full">
-              <img
+              <ZoomableImage
                 key={photo.id}
                 src={assetURL || photo.placeholder || photo.src}
                 alt={photo.alt}
+                naturalWidth={photo.width}
+                naturalHeight={photo.height}
                 onLoad={() => setIsLoading(false)}
-                onClick={(event) => event.stopPropagation()}
-                className={`relative z-[1] h-full w-full object-contain transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                className={`transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
               />
             </div>
           </div>

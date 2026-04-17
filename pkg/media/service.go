@@ -150,14 +150,31 @@ func (s *Service) syncFile(absPath string) (uint, error) {
 		return photo.ID, nil
 	}
 
+	exifMeta, err := images.ExtractExif(absPath)
+	if err != nil {
+		s.logger.Warn("exif extraction failed", "path", absPath, "err", err)
+	}
+
 	processed, err := images.ProcessImage(absPath, s.cfg.CacheDir, hash)
 	if err != nil {
 		return 0, err
 	}
 
-	exifMeta, err := images.ExtractExif(absPath)
-	if err != nil {
-		s.logger.Warn("exif extraction failed", "path", absPath, "err", err)
+	scrubbedSubdir := filepath.Join(s.cfg.CacheDir, "originals", hash[:2], hash[2:4])
+	_ = os.MkdirAll(scrubbedSubdir, 0o755)
+	scrubbedOriginal := filepath.Join(scrubbedSubdir, hash+".jpg")
+
+	if err := images.ScrubAndSaveJpeg(absPath, scrubbedOriginal, exifMeta); err != nil {
+		s.logger.Warn("failed to create scrubbed original", "path", absPath, "err", err)
+	}
+
+	for _, derivative := range processed.Derivatives {
+		dPath := filepath.Join(s.cfg.CacheDir, derivative.RelativePath)
+		_ = images.ScrubAndSaveJpeg(dPath, dPath, exifMeta)
+	}
+	if processed.Placeholder != "" {
+		pPath := filepath.Join(s.cfg.CacheDir, processed.Placeholder)
+		_ = images.ScrubAndSaveJpeg(pPath, pPath, exifMeta)
 	}
 
 	photo.RelativePath = relPath
@@ -348,7 +365,7 @@ func (s *Service) toGalleryItem(photo models.Photo) GalleryItem {
 		Width:        photo.Width,
 		Height:       photo.Height,
 		Src:          s.cfg.CacheURL(largest.RelativePath),
-		OriginalSrc:  s.cfg.OriginalURL(photo.RelativePath),
+		OriginalSrc:  s.cfg.CacheURL(filepath.ToSlash(filepath.Join("originals", photo.Hash[:2], photo.Hash[2:4], photo.Hash+".jpg"))),
 		Placeholder:  s.cfg.CacheURL(placeholder.RelativePath),
 		SrcSet:       buildSrcSet(s.cfg, photo.Derivatives),
 		Sizes:        "(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw",

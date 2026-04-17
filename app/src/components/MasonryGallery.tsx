@@ -7,12 +7,14 @@ import type { GalleryItem } from '../lib/types'
 type MasonryGalleryProps = {
   photos: GalleryItem[]
   onOpen: (index: number) => void
+  isMasonry?: boolean
 }
 
 type MasonryEntry = {
   index: number
   photo: GalleryItem
   estimatedHeight: number
+  aspectRatio: string
 }
 
 type MasonryColumn = {
@@ -21,7 +23,7 @@ type MasonryColumn = {
   height: number
 }
 
-export function MasonryGallery({ photos, onOpen }: MasonryGalleryProps) {
+export function MasonryGallery({ photos, onOpen, isMasonry }: MasonryGalleryProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [width, setWidth] = useState(0)
 
@@ -41,7 +43,10 @@ export function MasonryGallery({ photos, onOpen }: MasonryGalleryProps) {
 
   const columns = useMemo(() => {
     const gap = width >= 960 ? 14 : 10
-    const count = width >= 2560 ? 4 : width >= 1920 ? 3 : width >= 1440 ? 2 : 1
+    let count = width >= 2560 ? 4 : width >= 1920 ? 3 : width >= 1440 ? 2 : 1
+    if (isMasonry) {
+      count += 1
+    }
     const columnWidth = width > 0 ? Math.max(240, Math.floor((width - gap * (count - 1)) / count)) : 320
     const next = Array.from({ length: count }, (_, index) => ({
       key: `column-${index}`,
@@ -50,9 +55,18 @@ export function MasonryGallery({ photos, onOpen }: MasonryGalleryProps) {
     }))
 
     photos.forEach((photo, index) => {
-      const estimatedHeight = Math.max(180, Math.round(columnWidth * (photo.height / photo.width)))
+      let calcRatio = photo.height / photo.width
+      let cssRatio = `${photo.width} / ${photo.height}`
+
+      if (isMasonry) {
+        const ratios = [1.0, 1.333, 0.75, 1.5, 0.666]
+        calcRatio = ratios[photo.id % ratios.length]
+        cssRatio = `${1 / calcRatio}`
+      }
+
+      const estimatedHeight = Math.max(180, Math.round(columnWidth * calcRatio))
       const target = next.reduce((best, column) => (column.height < best.height ? column : best), next[0])
-      target.items.push({ index, photo, estimatedHeight })
+      target.items.push({ index, photo, estimatedHeight, aspectRatio: cssRatio })
       target.height += estimatedHeight + gap
     })
 
@@ -64,7 +78,7 @@ export function MasonryGallery({ photos, onOpen }: MasonryGalleryProps) {
         height: Math.max(0, column.height - gap),
       })),
     }
-  }, [photos, width])
+  }, [photos, width, isMasonry])
 
   return (
     <div ref={containerRef} className="w-full">
@@ -205,7 +219,7 @@ function GalleryCard({
           <div
             className="relative overflow-hidden"
             style={{
-              aspectRatio: `${entry.photo.width} / ${entry.photo.height}`,
+              aspectRatio: entry.aspectRatio,
             }}
           >
             <img

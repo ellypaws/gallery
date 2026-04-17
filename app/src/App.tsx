@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { gsap } from 'gsap'
-import { MoonStar, SunMedium } from 'lucide-react'
+import { Grid, LayoutDashboard, MoonStar, SunMedium } from 'lucide-react'
 
 import { AdminPanel } from './components/AdminPanel'
 import DarkVeil from './components/DarkVeil'
@@ -16,6 +16,7 @@ function App() {
   const [photos, setPhotos] = useState<GalleryItem[]>([])
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const [isFetching, setIsFetching] = useState(true)
+  const [isMasonry, setIsMasonry] = useState(false)
 
   const isAdmin = window.location.pathname.startsWith('/admin')
 
@@ -60,6 +61,15 @@ function App() {
     toggleTheme()
   }
 
+  function animateLayoutToggle() {
+    gsap.fromTo(
+      '.layout-switch',
+      { scale: 0.94, y: 2 },
+      { scale: 1, y: 0, duration: 0.35, ease: 'back.out(1.5)' },
+    )
+    setIsMasonry((m) => !m)
+  }
+
   if (isAdmin) {
     return <AdminPanel photos={photos} onRefresh={loadGallery} />
   }
@@ -70,14 +80,24 @@ function App() {
         <DarkVeil speed={0.2} noiseIntensity={0.08} />
       </div>
 
-      <button
-        type="button"
-        onClick={animateThemeToggle}
-        className="theme-switch fixed right-4 top-4 z-40 inline-flex h-11 w-11 items-center justify-center rounded-md border border-[var(--line)] bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow)] transition hover:border-[var(--accent)]"
-        aria-label="Toggle theme"
-      >
-        {theme === 'dark' ? <SunMedium className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
-      </button>
+      <div className="fixed right-4 top-4 z-40 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={animateLayoutToggle}
+          className="layout-switch inline-flex h-11 w-11 items-center justify-center rounded-md border border-[var(--line)] bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow)] transition hover:border-[var(--accent)]"
+          aria-label="Toggle layout"
+        >
+          {isMasonry ? <LayoutDashboard className="h-4 w-4" /> : <Grid className="h-4 w-4" />}
+        </button>
+        <button
+          type="button"
+          onClick={animateThemeToggle}
+          className="theme-switch inline-flex h-11 w-11 items-center justify-center rounded-md border border-[var(--line)] bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow)] transition hover:border-[var(--accent)]"
+          aria-label="Toggle theme"
+        >
+          {theme === 'dark' ? <SunMedium className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
+        </button>
+      </div>
 
       <main className="relative z-10 px-4 pb-8 pt-4 md:px-8 md:pt-6">
         <section className="mx-auto max-w-[1540px]">
@@ -87,7 +107,7 @@ function App() {
         </section>
 
         <section className="mx-auto mt-6 max-w-[1540px]">
-          {isFetching ? <div className="min-h-[60vh]" /> : <MasonryGallery photos={photos} onOpen={setActiveIndex} />}
+          {isFetching ? <div className="min-h-[60vh]" /> : <MasonryGallery photos={photos} onOpen={setActiveIndex} isMasonry={isMasonry} />}
         </section>
       </main>
 

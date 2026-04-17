@@ -3,6 +3,7 @@ import { gsap } from 'gsap'
 import { MoonStar, SunMedium } from 'lucide-react'
 
 import { AdminPanel } from './components/AdminPanel'
+import DarkVeil from './components/DarkVeil'
 import { Lightbox } from './components/Lightbox'
 import { MasonryGallery } from './components/MasonryGallery'
 import { useTheme } from './hooks/useTheme'
@@ -64,7 +65,11 @@ function App() {
   }
 
   return (
-    <div ref={shellRef} className="min-h-screen">
+    <div ref={shellRef} className="relative min-h-screen">
+      <div className="pointer-events-none absolute left-0 top-0 z-0 h-[80vh] max-h-[800px] min-h-[400px] w-full overflow-hidden opacity-60 [mask-image:linear-gradient(to_bottom,black_40%,transparent_100%)]">
+        <DarkVeil speed={0.2} noiseIntensity={0.08} />
+      </div>
+
       <button
         type="button"
         onClick={animateThemeToggle}
@@ -74,7 +79,7 @@ function App() {
         {theme === 'dark' ? <SunMedium className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
       </button>
 
-      <main className="px-4 pb-8 pt-4 md:px-8 md:pt-6">
+      <main className="relative z-10 px-4 pb-8 pt-4 md:px-8 md:pt-6">
         <section className="mx-auto max-w-[1540px]">
           <h1 className="hero-copy pointer-events-none font-teko text-[288px] max-xl:text-[220px] max-lg:text-[160px] max-md:text-[120px] max-sm:text-[96px] font-bold text-[var(--hero-title)] tracking-tight leading-[0.8] -mb-[80px] max-md:-mb-[30px] drop-shadow-sm text-left antialiased block w-full max-w-[1200px] break-words relative z-20 -rotate-2 origin-left">
             Elly

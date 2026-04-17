@@ -183,8 +183,6 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
               key={photo.id}
               src={assetURL || photo.placeholder || photo.src}
               alt={photo.alt}
-              srcSet={photo.srcSet}
-              sizes={photo.sizes}
               onLoad={() => setIsLoading(false)}
               onClick={(event) => event.stopPropagation()}
               className={`relative z-[1] h-full w-full object-contain transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}

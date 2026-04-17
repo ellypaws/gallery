@@ -5,7 +5,8 @@ import { gsap } from 'gsap'
 import type { GalleryItem } from '../lib/types'
 
 type MasonryGalleryProps = {
-  photos: GalleryItem[]
+  photos?: GalleryItem[]
+  items?: { photo: GalleryItem; globalIndex: number }[]
   onOpen: (index: number) => void
   isMasonry?: boolean
 }
@@ -23,7 +24,7 @@ type MasonryColumn = {
   height: number
 }
 
-export function MasonryGallery({ photos, onOpen, isMasonry }: MasonryGalleryProps) {
+export function MasonryGallery({ photos, items, onOpen, isMasonry }: MasonryGalleryProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [width, setWidth] = useState(0)
 
@@ -54,7 +55,9 @@ export function MasonryGallery({ photos, onOpen, isMasonry }: MasonryGalleryProp
       height: 0,
     }))
 
-    photos.forEach((photo, index) => {
+    const dataSource = items || (photos ? photos.map((photo, i) => ({ photo, globalIndex: i })) : [])
+
+    dataSource.forEach(({ photo, globalIndex }) => {
       let calcRatio = photo.height / photo.width
       let cssRatio = `${photo.width} / ${photo.height}`
 
@@ -66,7 +69,7 @@ export function MasonryGallery({ photos, onOpen, isMasonry }: MasonryGalleryProp
 
       const estimatedHeight = Math.max(180, Math.round(columnWidth * calcRatio))
       const target = next.reduce((best, column) => (column.height < best.height ? column : best), next[0])
-      target.items.push({ index, photo, estimatedHeight, aspectRatio: cssRatio })
+      target.items.push({ index: globalIndex, photo, estimatedHeight, aspectRatio: cssRatio })
       target.height += estimatedHeight + gap
     })
 
@@ -78,7 +81,7 @@ export function MasonryGallery({ photos, onOpen, isMasonry }: MasonryGalleryProp
         height: Math.max(0, column.height - gap),
       })),
     }
-  }, [photos, width, isMasonry])
+  }, [photos, items, width, isMasonry])
 
   return (
     <div ref={containerRef} className="w-full">

@@ -66,6 +66,8 @@ type PhotoOverrideInput struct {
 	Description *string `json:"description"`
 	SortOrder   *int    `json:"sort_order"`
 	Hidden      *bool   `json:"hidden"`
+	CapturedAt  *string `json:"captured_at"`
+	UpdatedAt   *string `json:"updated_at"`
 }
 
 func NewService(cfg config.Config, db *gorm.DB, logger *log.Logger) *Service {
@@ -384,7 +386,16 @@ func (s *Service) UpdateOverride(ctx context.Context, photoID uint, input PhotoO
 	defer s.dbMu.Unlock()
 
 	var photo models.Photo
-	if err := s.db.WithContext(ctx).Preload("Override").First(&photo, photoID).Error; err != nil {
+	if err := s.db.WithContext(ctx).Preload("Override").Preload("Exif").First(&photo, photoID).Error; err != nil {
+		return err
+	}
+
+	capturedAt, err := parseOptionalTimestamp(input.CapturedAt)
+	if err != nil {
+		return err
+	}
+	updatedAt, err := parseRequiredTimestamp(input.UpdatedAt)
+	if err != nil {
 		return err
 	}
 
@@ -405,7 +416,41 @@ func (s *Service) UpdateOverride(ctx context.Context, photoID uint, input PhotoO
 	if input.Hidden != nil {
 		override.Hidden = *input.Hidden
 	}
-	return s.db.WithContext(ctx).Save(&override).Error
+
+	exifRow := photo.Exif
+	exifRow.PhotoID = photo.ID
+	if input.CapturedAt != nil {
+		exifRow.CapturedAt = capturedAt
+	}
+
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(&override).Error; err != nil {
+			return err
+		}
+
+		if input.CapturedAt != nil || input.UpdatedAt != nil {
+			updates := map[string]any{}
+			if input.CapturedAt != nil {
+				updates["taken_at"] = capturedAt
+			}
+			if input.UpdatedAt != nil && updatedAt != nil {
+				updates["updated_at"] = *updatedAt
+			}
+			if len(updates) > 0 {
+				if err := tx.Model(&models.Photo{}).Where("id = ?", photo.ID).UpdateColumns(updates).Error; err != nil {
+					return err
+				}
+			}
+		}
+
+		if input.CapturedAt != nil {
+			if err := tx.Save(&exifRow).Error; err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
 }
 
 func (s *Service) toGalleryItem(photo models.Photo) GalleryItem {
@@ -443,7 +488,7 @@ func (s *Service) toGalleryItem(photo models.Photo) GalleryItem {
 		Shutter:      photo.Exif.Shutter,
 		ISO:          photo.Exif.ISO,
 		FocalLength:  photo.Exif.FocalLength,
-		CapturedAt:   photo.Exif.CapturedAt,
+		CapturedAt:   photo.TakenAt,
 		UpdatedAt:    photo.UpdatedAt,
 		SortOrder:    photo.Override.SortOrder,
 		Hidden:       photo.Override.Hidden,
@@ -565,4 +610,38 @@ func normalizeRelativePath(path string) string {
 func escapeLike(value string) string {
 	replacer := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 	return replacer.Replace(value)
+}
+
+func parseOptionalTimestamp(value *string) (*time.Time, error) {
+	if value == nil {
+		return nil, nil
+	}
+
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil, nil
+	}
+
+	parsed, err := time.Parse(time.RFC3339, trimmed)
+	if err != nil {
+		return nil, fmt.Errorf("invalid captured_at: %w", err)
+	}
+	return &parsed, nil
+}
+
+func parseRequiredTimestamp(value *string) (*time.Time, error) {
+	if value == nil {
+		return nil, nil
+	}
+
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil, errors.New("updated_at cannot be empty")
+	}
+
+	parsed, err := time.Parse(time.RFC3339, trimmed)
+	if err != nil {
+		return nil, fmt.Errorf("invalid updated_at: %w", err)
+	}
+	return &parsed, nil
 }

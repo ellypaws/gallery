@@ -9,7 +9,7 @@ type AdminPanelProps = {
   onRefresh: () => Promise<void>
 }
 
-type DraftMap = Record<number, { title: string; alt: string; description: string; sortOrder: number; hidden: boolean }>
+type DraftMap = Record<number, { title: string; alt: string; description: string; sortOrder: number; hidden: boolean; capturedAt: string; updatedAt: string }>
 
 export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
   const [isBusy, setIsBusy] = useState(false)
@@ -24,6 +24,8 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
           description: photo.description,
           sortOrder: photo.sortOrder,
           hidden: photo.hidden,
+          capturedAt: toDateTimeLocalValue(photo.capturedAt),
+          updatedAt: toDateTimeLocalValue(photo.updatedAt),
         },
       ]),
     ),
@@ -40,6 +42,8 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
             description: photo.description,
             sortOrder: photo.sortOrder,
             hidden: photo.hidden,
+            capturedAt: toDateTimeLocalValue(photo.capturedAt),
+            updatedAt: toDateTimeLocalValue(photo.updatedAt),
           },
         ]),
       ),
@@ -58,6 +62,8 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
             description: photo.description,
             sortOrder: photo.sortOrder,
             hidden: photo.hidden,
+            capturedAt: toDateTimeLocalValue(photo.capturedAt),
+            updatedAt: toDateTimeLocalValue(photo.updatedAt),
           },
       })),
     [drafts, photos],
@@ -110,6 +116,8 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
         description: draft.description,
         sort_order: draft.sortOrder,
         hidden: draft.hidden,
+        captured_at: toAPIDateTimeValue(draft.capturedAt),
+        updated_at: toAPIDateTimeValue(draft.updatedAt) ?? undefined,
       })
       await onRefresh()
       setNotice('Photo updated.')
@@ -220,6 +228,34 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
                     className="rounded-md border border-[var(--line)] bg-transparent px-3 py-2 text-[var(--text)] outline-none transition focus:border-[var(--accent)]"
                   />
                 </label>
+                <label className="flex flex-col gap-2 text-sm text-[var(--muted)]">
+                  Date Taken
+                  <input
+                    type="datetime-local"
+                    value={draft.capturedAt}
+                    onChange={(event) =>
+                      setDrafts((current) => ({
+                        ...current,
+                        [photo.id]: { ...draft, capturedAt: event.target.value },
+                      }))
+                    }
+                    className="rounded-md border border-[var(--line)] bg-transparent px-3 py-2 text-[var(--text)] outline-none transition focus:border-[var(--accent)]"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-sm text-[var(--muted)]">
+                  Date Modified
+                  <input
+                    type="datetime-local"
+                    value={draft.updatedAt}
+                    onChange={(event) =>
+                      setDrafts((current) => ({
+                        ...current,
+                        [photo.id]: { ...draft, updatedAt: event.target.value },
+                      }))
+                    }
+                    className="rounded-md border border-[var(--line)] bg-transparent px-3 py-2 text-[var(--text)] outline-none transition focus:border-[var(--accent)]"
+                  />
+                </label>
                 <label className="flex items-center gap-3 self-end text-sm text-[var(--text)]">
                   <input
                     type="checkbox"
@@ -251,4 +287,32 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
       </div>
     </main>
   )
+}
+
+function toDateTimeLocalValue(value: string | null | undefined) {
+  if (!value) {
+    return ''
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function toAPIDateTimeValue(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return null
+  }
+
+  const date = new Date(trimmed)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+
+  return date.toISOString()
 }

@@ -17,6 +17,7 @@ export type GalleryItem = {
   iso: string
   focalLength: string
   capturedAt: string | null
+  updatedAt: string
   sortOrder: number
   hidden: boolean
   relativePath: string
@@ -33,4 +34,6 @@ export type PhotoPatchPayload = {
   description?: string
   sort_order?: number
   hidden?: boolean
+  captured_at?: string | null
+  updated_at?: string
 }

@@ -12,7 +12,16 @@ import (
 
 func IsSupportedImage(path string) bool {
 	switch strings.ToLower(filepath.Ext(path)) {
-	case ".jpg", ".jpeg", ".png":
+	case ".jpg", ".jpeg", ".png", ".heic", ".heif":
+		return true
+	default:
+		return false
+	}
+}
+
+func IsJPEG(path string) bool {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".jpg", ".jpeg":
 		return true
 	default:
 		return false

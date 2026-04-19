@@ -128,18 +128,14 @@ func (s *Service) SyncLibrary(ctx context.Context) error {
 		seen = append(seen, res.id)
 	}
 
-	s.dbMu.Lock()
-	query := s.db
-	if len(seen) > 0 {
-		query = query.Where("id NOT IN ?", seen)
-	} else {
-		query = query.Session(&gorm.Session{AllowGlobalUpdate: true})
+	missingPhotos, err := s.listMissingPhotos(seen)
+	if err != nil {
+		return err
 	}
-	errDelete := query.Delete(&models.Photo{}).Error
-	s.dbMu.Unlock()
-
-	if errDelete != nil {
-		return errDelete
+	for _, photo := range missingPhotos {
+		if err := s.deletePhoto(photo); err != nil {
+			return err
+		}
 	}
 
 	s.logger.Info("library sync completed successfully", "processed_count", len(seen))
@@ -196,7 +192,7 @@ func (s *Service) syncFile(absPath string) (uint, error) {
 	_ = os.MkdirAll(scrubbedSubdir, 0o755)
 	scrubbedOriginal := filepath.Join(scrubbedSubdir, hash+".jpg")
 
-	if err := images.ScrubAndSaveJpeg(absPath, scrubbedOriginal, exifMeta, s.logger); err != nil {
+	if err := images.SaveOriginalJpeg(absPath, scrubbedOriginal, exifMeta, s.logger); err != nil {
 		s.logger.Warn("failed to create scrubbed original", "path", absPath, "err", err)
 	}
 
@@ -350,7 +346,17 @@ func (s *Service) UploadFiles(ctx context.Context, filenames []string) error {
 			return ctx.Err()
 		default:
 		}
-		_, err := s.syncFile(filepath.Join(s.cfg.MediaDir, name))
+
+		relPath := normalizeRelativePath(name)
+		absPath := filepath.Join(s.cfg.MediaDir, filepath.FromSlash(relPath))
+		if _, err := os.Stat(absPath); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return s.deleteMissingPath(relPath)
+			}
+			return err
+		}
+
+		_, err := s.syncFile(absPath)
 		return err
 	})
 	go pool.AddAndClose(filenames...)
@@ -469,4 +475,86 @@ func pickVariant(rows []models.Derivative, variant string) models.Derivative {
 		}
 	}
 	return pickLargestDerivative(rows)
+}
+
+func (s *Service) listMissingPhotos(seen []uint) ([]models.Photo, error) {
+	var photos []models.Photo
+
+	s.dbMu.RLock()
+	query := s.db.Preload("Derivatives")
+	if len(seen) > 0 {
+		query = query.Where("id NOT IN ?", seen)
+	}
+	err := query.Find(&photos).Error
+	s.dbMu.RUnlock()
+	if err != nil {
+		return nil, err
+	}
+	return photos, nil
+}
+
+func (s *Service) deleteMissingPath(relPath string) error {
+	relPath = normalizeRelativePath(relPath)
+	if relPath == "" {
+		return nil
+	}
+
+	var photos []models.Photo
+	likePrefix := escapeLike(relPath) + "/%"
+
+	s.dbMu.RLock()
+	err := s.db.Preload("Derivatives").
+		Where("relative_path = ? OR relative_path LIKE ? ESCAPE '\\'", relPath, likePrefix).
+		Find(&photos).Error
+	s.dbMu.RUnlock()
+	if err != nil {
+		return err
+	}
+
+	for _, photo := range photos {
+		if err := s.deletePhoto(photo); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *Service) deletePhoto(photo models.Photo) error {
+	s.dbMu.Lock()
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		return tx.Delete(&photo).Error
+	})
+	s.dbMu.Unlock()
+	if err != nil {
+		return err
+	}
+
+	cachePaths := make([]string, 0, len(photo.Derivatives)+1)
+	for _, derivative := range photo.Derivatives {
+		cachePaths = append(cachePaths, filepath.Join(s.cfg.CacheDir, filepath.FromSlash(derivative.RelativePath)))
+	}
+	if len(photo.Hash) >= 4 {
+		cachePaths = append(cachePaths, filepath.Join(s.cfg.CacheDir, "originals", photo.Hash[:2], photo.Hash[2:4], photo.Hash+".jpg"))
+	}
+
+	for _, cachePath := range cachePaths {
+		if err := os.Remove(cachePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			s.logger.Warn("failed to remove cached derivative", "path", cachePath, "err", err)
+		}
+	}
+
+	s.logger.Info("removed missing image", "path", photo.RelativePath, "hash", photo.Hash)
+	return nil
+}
+
+func normalizeRelativePath(path string) string {
+	clean := filepath.ToSlash(filepath.Clean(path))
+	clean = strings.TrimPrefix(clean, "./")
+	return strings.TrimPrefix(clean, "/")
+}
+
+func escapeLike(value string) string {
+	replacer := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	return replacer.Replace(value)
 }

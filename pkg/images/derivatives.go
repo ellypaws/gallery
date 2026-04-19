@@ -9,10 +9,14 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"gallery/pkg/utils"
 
 	"github.com/charmbracelet/log"
 	"github.com/disintegration/imaging"
 	"github.com/dlecorfec/progjpeg"
+	"github.com/gen2brain/heic"
 )
 
 var responsiveWidths = []int{480, 768, 1280, 1800, 2400}
@@ -42,7 +46,7 @@ func ProcessImage(srcPath, cacheDir, hash string, logger *log.Logger) (Processed
 	}
 
 	logger.Debug("opening target image for derivation", "path", srcPath)
-	img, err := imaging.Open(srcPath, imaging.AutoOrientation(true))
+	img, err := openSourceImage(srcPath)
 	if err != nil {
 		return ProcessedImage{}, err
 	}
@@ -103,6 +107,35 @@ func ProcessImage(srcPath, cacheDir, hash string, logger *log.Logger) (Processed
 	})
 
 	return result, nil
+}
+
+func SaveOriginalJpeg(srcPath, dstPath string, meta ExifMetadata, logger *log.Logger) error {
+	if utils.IsJPEG(srcPath) {
+		return ScrubAndSaveJpeg(srcPath, dstPath, meta, logger)
+	}
+
+	img, err := openSourceImage(srcPath)
+	if err != nil {
+		return err
+	}
+	if err := writeProgressiveJPEG(dstPath, img, 90); err != nil {
+		return err
+	}
+	return ScrubAndSaveJpeg(dstPath, dstPath, meta, logger)
+}
+
+func openSourceImage(srcPath string) (image.Image, error) {
+	switch strings.ToLower(filepath.Ext(srcPath)) {
+	case ".heic", ".heif":
+		file, err := os.Open(srcPath)
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close()
+		return heic.Decode(file)
+	default:
+		return imaging.Open(srcPath, imaging.AutoOrientation(true))
+	}
 }
 
 func widthsFor(originalWidth int) []int {

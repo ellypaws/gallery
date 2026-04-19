@@ -8,7 +8,9 @@ require (
 	github.com/disintegration/imaging v1.6.2
 	github.com/dlecorfec/progjpeg v1.0.0
 	github.com/dsoprea/go-exif/v3 v3.0.1
+	github.com/dsoprea/go-jpeg-image-structure/v2 v2.0.0-20221012074422-4f3f7e934102
 	github.com/fsnotify/fsnotify v1.9.0
+	github.com/gen2brain/heic v0.4.9
 	github.com/joho/godotenv v1.5.1
 	github.com/labstack/echo/v4 v4.15.1
 	gorm.io/driver/sqlite v1.6.0
@@ -23,11 +25,11 @@ require (
 	github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/dsoprea/go-iptc v0.0.0-20200609062250-162ae6b44feb // indirect
-	github.com/dsoprea/go-jpeg-image-structure/v2 v2.0.0-20221012074422-4f3f7e934102 // indirect
 	github.com/dsoprea/go-logging v0.0.0-20200710184922-b02d349568dd // indirect
 	github.com/dsoprea/go-photoshop-info-format v0.0.0-20200609050348-3db9b63b202c // indirect
 	github.com/dsoprea/go-utility/v2 v2.0.0-20221003172846-a3e1774ef349 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/ebitengine/purego v0.9.1 // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
 	github.com/go-logfmt/logfmt v0.6.1 // indirect
 	github.com/go-xmlfmt/xmlfmt v0.0.0-20191208150333-d5b6f63a941b // indirect
@@ -45,6 +47,7 @@ require (
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/tetratelabs/wazero v1.9.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect

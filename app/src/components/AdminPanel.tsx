@@ -134,7 +134,7 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
               Upload Images
               <input
                 type="file"
-                accept=".jpg,.jpeg,.png"
+                accept=".jpg,.jpeg,.png,.heic,.heif"
                 multiple
                 className="hidden"
                 onChange={(event) => void handleUpload(event.target.files)}

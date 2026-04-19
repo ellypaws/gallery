@@ -89,9 +89,7 @@ function App() {
     const order: string[] = []
 
     photos.forEach((photo, i) => {
-      // @ts-ignore
-      const dateVal = photo.capturedAt || photo.updatedAt
-      const label = getTimelineGroup(dateVal)
+      const label = photo.timelineGroup || getTimelineGroup(photo.capturedAt || photo.updatedAt)
       if (!map.has(label)) {
         map.set(label, [])
         order.push(label)

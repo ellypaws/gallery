@@ -24,8 +24,8 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
           description: photo.description,
           sortOrder: photo.sortOrder,
           hidden: photo.hidden,
-          capturedAt: toDateTimeLocalValue(photo.capturedAt),
-          updatedAt: toDateTimeLocalValue(photo.updatedAt),
+          capturedAt: photo.capturedAtLocal,
+          updatedAt: photo.updatedAtLocal,
         },
       ]),
     ),
@@ -42,8 +42,8 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
             description: photo.description,
             sortOrder: photo.sortOrder,
             hidden: photo.hidden,
-            capturedAt: toDateTimeLocalValue(photo.capturedAt),
-            updatedAt: toDateTimeLocalValue(photo.updatedAt),
+            capturedAt: photo.capturedAtLocal,
+            updatedAt: photo.updatedAtLocal,
           },
         ]),
       ),
@@ -62,8 +62,8 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
             description: photo.description,
             sortOrder: photo.sortOrder,
             hidden: photo.hidden,
-            capturedAt: toDateTimeLocalValue(photo.capturedAt),
-            updatedAt: toDateTimeLocalValue(photo.updatedAt),
+            capturedAt: photo.capturedAtLocal,
+            updatedAt: photo.updatedAtLocal,
           },
       })),
     [drafts, photos],
@@ -116,8 +116,8 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
         description: draft.description,
         sort_order: draft.sortOrder,
         hidden: draft.hidden,
-        captured_at: toAPIDateTimeValue(draft.capturedAt),
-        updated_at: toAPIDateTimeValue(draft.updatedAt) ?? undefined,
+        captured_at_local: draft.capturedAt || null,
+        updated_at_local: draft.updatedAt || undefined,
       })
       await onRefresh()
       setNotice('Photo updated.')
@@ -287,32 +287,4 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
       </div>
     </main>
   )
-}
-
-function toDateTimeLocalValue(value: string | null | undefined) {
-  if (!value) {
-    return ''
-  }
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return ''
-  }
-
-  const pad = (part: number) => String(part).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
-
-function toAPIDateTimeValue(value: string) {
-  const trimmed = value.trim()
-  if (!trimmed) {
-    return null
-  }
-
-  const date = new Date(trimmed)
-  if (Number.isNaN(date.getTime())) {
-    return null
-  }
-
-  return date.toISOString()
 }

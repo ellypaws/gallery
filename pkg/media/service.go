@@ -36,38 +36,43 @@ type GalleryResponse struct {
 }
 
 type GalleryItem struct {
-	ID           uint       `json:"id"`
-	Title        string     `json:"title"`
-	Alt          string     `json:"alt"`
-	Description  string     `json:"description"`
-	Width        int        `json:"width"`
-	Height       int        `json:"height"`
-	Src          string     `json:"src"`
-	OriginalSrc  string     `json:"originalSrc"`
-	Placeholder  string     `json:"placeholder"`
-	SrcSet       string     `json:"srcSet"`
-	Sizes        string     `json:"sizes"`
-	Camera       string     `json:"camera"`
-	Lens         string     `json:"lens"`
-	Aperture     string     `json:"aperture"`
-	Shutter      string     `json:"shutter"`
-	ISO          string     `json:"iso"`
-	FocalLength  string     `json:"focalLength"`
-	CapturedAt   *time.Time `json:"capturedAt"`
-	UpdatedAt    time.Time  `json:"updatedAt"`
-	SortOrder    int        `json:"sortOrder"`
-	Hidden       bool       `json:"hidden"`
-	RelativePath string     `json:"relativePath"`
+	ID              uint       `json:"id"`
+	Title           string     `json:"title"`
+	Alt             string     `json:"alt"`
+	Description     string     `json:"description"`
+	Width           int        `json:"width"`
+	Height          int        `json:"height"`
+	Src             string     `json:"src"`
+	OriginalSrc     string     `json:"originalSrc"`
+	Placeholder     string     `json:"placeholder"`
+	SrcSet          string     `json:"srcSet"`
+	Sizes           string     `json:"sizes"`
+	Camera          string     `json:"camera"`
+	Lens            string     `json:"lens"`
+	Aperture        string     `json:"aperture"`
+	Shutter         string     `json:"shutter"`
+	ISO             string     `json:"iso"`
+	FocalLength     string     `json:"focalLength"`
+	CapturedAt      *time.Time `json:"capturedAt"`
+	CapturedAtLocal string     `json:"capturedAtLocal"`
+	UpdatedAt       time.Time  `json:"updatedAt"`
+	UpdatedAtLocal  string     `json:"updatedAtLocal"`
+	TimelineGroup   string     `json:"timelineGroup"`
+	SortOrder       int        `json:"sortOrder"`
+	Hidden          bool       `json:"hidden"`
+	RelativePath    string     `json:"relativePath"`
 }
 
 type PhotoOverrideInput struct {
-	Title       *string `json:"title"`
-	Alt         *string `json:"alt"`
-	Description *string `json:"description"`
-	SortOrder   *int    `json:"sort_order"`
-	Hidden      *bool   `json:"hidden"`
-	CapturedAt  *string `json:"captured_at"`
-	UpdatedAt   *string `json:"updated_at"`
+	Title           *string `json:"title"`
+	Alt             *string `json:"alt"`
+	Description     *string `json:"description"`
+	SortOrder       *int    `json:"sort_order"`
+	Hidden          *bool   `json:"hidden"`
+	CapturedAt      *string `json:"captured_at"`
+	UpdatedAt       *string `json:"updated_at"`
+	CapturedAtLocal *string `json:"captured_at_local"`
+	UpdatedAtLocal  *string `json:"updated_at_local"`
 }
 
 func NewService(cfg config.Config, db *gorm.DB, logger *log.Logger) *Service {
@@ -398,6 +403,18 @@ func (s *Service) UpdateOverride(ctx context.Context, photoID uint, input PhotoO
 	if err != nil {
 		return err
 	}
+	if input.CapturedAtLocal != nil {
+		capturedAt, err = parseOptionalLocalTimestamp(input.CapturedAtLocal)
+		if err != nil {
+			return err
+		}
+	}
+	if input.UpdatedAtLocal != nil {
+		updatedAt, err = parseRequiredLocalTimestamp(input.UpdatedAtLocal)
+		if err != nil {
+			return err
+		}
+	}
 
 	override := photo.Override
 	override.PhotoID = photo.ID
@@ -471,28 +488,31 @@ func (s *Service) toGalleryItem(photo models.Photo) GalleryItem {
 	}
 
 	return GalleryItem{
-		ID:           photo.ID,
-		Title:        title,
-		Alt:          alt,
-		Description:  photo.Override.Description,
-		Width:        photo.Width,
-		Height:       photo.Height,
-		Src:          s.cfg.CacheURL(largest.RelativePath),
-		OriginalSrc:  s.cfg.CacheURL(filepath.ToSlash(filepath.Join("originals", photo.Hash[:2], photo.Hash[2:4], photo.Hash+".jpg"))),
-		Placeholder:  s.cfg.CacheURL(placeholder.RelativePath),
-		SrcSet:       buildSrcSet(s.cfg, photo.Derivatives),
-		Sizes:        "(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw",
-		Camera:       strings.TrimSpace(strings.TrimSpace(photo.Exif.CameraMake + " " + photo.Exif.CameraModel)),
-		Lens:         lensModel,
-		Aperture:     photo.Exif.Aperture,
-		Shutter:      photo.Exif.Shutter,
-		ISO:          photo.Exif.ISO,
-		FocalLength:  photo.Exif.FocalLength,
-		CapturedAt:   photo.TakenAt,
-		UpdatedAt:    photo.UpdatedAt,
-		SortOrder:    photo.Override.SortOrder,
-		Hidden:       photo.Override.Hidden,
-		RelativePath: photo.RelativePath,
+		ID:              photo.ID,
+		Title:           title,
+		Alt:             alt,
+		Description:     photo.Override.Description,
+		Width:           photo.Width,
+		Height:          photo.Height,
+		Src:             s.cfg.CacheURL(largest.RelativePath),
+		OriginalSrc:     s.cfg.CacheURL(filepath.ToSlash(filepath.Join("originals", photo.Hash[:2], photo.Hash[2:4], photo.Hash+".jpg"))),
+		Placeholder:     s.cfg.CacheURL(placeholder.RelativePath),
+		SrcSet:          buildSrcSet(s.cfg, photo.Derivatives),
+		Sizes:           "(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw",
+		Camera:          strings.TrimSpace(strings.TrimSpace(photo.Exif.CameraMake + " " + photo.Exif.CameraModel)),
+		Lens:            lensModel,
+		Aperture:        photo.Exif.Aperture,
+		Shutter:         photo.Exif.Shutter,
+		ISO:             photo.Exif.ISO,
+		FocalLength:     photo.Exif.FocalLength,
+		CapturedAt:      photo.TakenAt,
+		CapturedAtLocal: formatLocalDateTime(photo.TakenAt),
+		UpdatedAt:       photo.UpdatedAt,
+		UpdatedAtLocal:  formatLocalDateTime(&photo.UpdatedAt),
+		TimelineGroup:   timelineGroup(photo.TakenAt, photo.UpdatedAt),
+		SortOrder:       photo.Override.SortOrder,
+		Hidden:          photo.Override.Hidden,
+		RelativePath:    photo.RelativePath,
 	}
 }
 
@@ -644,4 +664,98 @@ func parseRequiredTimestamp(value *string) (*time.Time, error) {
 		return nil, fmt.Errorf("invalid updated_at: %w", err)
 	}
 	return &parsed, nil
+}
+
+func parseOptionalLocalTimestamp(value *string) (*time.Time, error) {
+	if value == nil {
+		return nil, nil
+	}
+
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil, nil
+	}
+
+	parsed, err := time.ParseInLocation("2006-01-02T15:04", trimmed, time.Local)
+	if err != nil {
+		return nil, fmt.Errorf("invalid captured_at_local: %w", err)
+	}
+	return &parsed, nil
+}
+
+func parseRequiredLocalTimestamp(value *string) (*time.Time, error) {
+	if value == nil {
+		return nil, nil
+	}
+
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil, errors.New("updated_at_local cannot be empty")
+	}
+
+	parsed, err := time.ParseInLocation("2006-01-02T15:04", trimmed, time.Local)
+	if err != nil {
+		return nil, fmt.Errorf("invalid updated_at_local: %w", err)
+	}
+	return &parsed, nil
+}
+
+func formatLocalDateTime(value *time.Time) string {
+	if value == nil {
+		return ""
+	}
+	return value.In(time.Local).Format("2006-01-02T15:04")
+}
+
+func timelineGroup(capturedAt *time.Time, updatedAt time.Time) string {
+	target := updatedAt
+	if capturedAt != nil {
+		target = *capturedAt
+	}
+
+	target = target.In(time.Local)
+	now := time.Now().In(time.Local)
+
+	today := localDayNumber(now)
+	day := localDayNumber(target)
+	diffDays := today - day
+
+	switch {
+	case diffDays < 0:
+		return "Future"
+	case diffDays == 0:
+		return "Today"
+	case diffDays == 1:
+		return "Yesterday"
+	case diffDays <= 14:
+		return fmt.Sprintf("%d days ago", diffDays)
+	}
+
+	diffWeeks := diffDays / 7
+	if diffWeeks <= 4 {
+		return fmt.Sprintf("%d weeks ago", diffWeeks)
+	}
+
+	diffMonths := (now.Year()-target.Year())*12 + int(now.Month()) - int(target.Month())
+	switch {
+	case diffMonths == 1:
+		return "1 month ago"
+	case diffMonths > 1 && diffMonths <= 11:
+		return fmt.Sprintf("%d months ago", diffMonths)
+	}
+
+	diffYears := now.Year() - target.Year()
+	switch diffYears {
+	case 1:
+		return "1 year ago"
+	case 2:
+		return "2 years ago"
+	default:
+		return "Long time ago"
+	}
+}
+
+func localDayNumber(value time.Time) int {
+	year, month, day := value.Date()
+	return int(time.Date(year, month, day, 0, 0, 0, 0, time.Local).Unix() / 86400)
 }

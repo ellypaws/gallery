@@ -17,7 +17,10 @@ export type GalleryItem = {
   iso: string
   focalLength: string
   capturedAt: string | null
+  capturedAtLocal: string
   updatedAt: string
+  updatedAtLocal: string
+  timelineGroup: string
   sortOrder: number
   hidden: boolean
   relativePath: string
@@ -36,4 +39,6 @@ export type PhotoPatchPayload = {
   hidden?: boolean
   captured_at?: string | null
   updated_at?: string
+  captured_at_local?: string | null
+  updated_at_local?: string
 }

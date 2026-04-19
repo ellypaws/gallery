@@ -38,6 +38,7 @@ func New(cfg config.Config, logger *log.Logger, mediaService *media.Service) *Ap
 
 	adminAuth := auth.BasicAuth(cfg)
 	adminAPI := e.Group("/api/admin", adminAuth)
+	adminAPI.GET("/gallery", handler.GetAdminGallery)
 	adminAPI.POST("/upload", handler.Upload)
 	adminAPI.POST("/rescan", handler.Rescan)
 	adminAPI.PATCH("/photos/:id", handler.PatchPhoto)

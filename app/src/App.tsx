@@ -7,7 +7,7 @@ import DarkVeil from './components/DarkVeil'
 import { Lightbox } from './components/Lightbox'
 import { MasonryGallery } from './components/MasonryGallery'
 import { useTheme } from './hooks/useTheme'
-import { fetchGallery } from './lib/api'
+import { fetchAdminGallery, fetchGallery } from './lib/api'
 import type { GalleryItem } from './lib/types'
 
 function App() {
@@ -24,7 +24,7 @@ function App() {
   async function loadGallery() {
     setIsFetching(true)
     try {
-      const response = await fetchGallery()
+      const response = isAdmin ? await fetchAdminGallery() : await fetchGallery()
       setPhotos(response.photos)
     } catch {
       setPhotos([])
@@ -35,7 +35,7 @@ function App() {
 
   useEffect(() => {
     void loadGallery()
-  }, [])
+  }, [isAdmin])
 
   useEffect(() => {
     if (!shellRef.current || isAdmin) {

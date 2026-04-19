@@ -30,6 +30,14 @@ func (h *Handler) GetGallery(c echo.Context) error {
 	return c.JSON(http.StatusOK, response)
 }
 
+func (h *Handler) GetAdminGallery(c echo.Context) error {
+	response, err := h.service.AdminGallery(c.Request().Context())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, response)
+}
+
 func (h *Handler) Upload(c echo.Context) error {
 	form, err := c.MultipartForm()
 	if err != nil {

@@ -13,6 +13,12 @@ export async function fetchGallery() {
   return (await response.json()) as GalleryResponse
 }
 
+export async function fetchAdminGallery() {
+  const response = await fetch('/api/admin/gallery')
+  await expectOK(response)
+  return (await response.json()) as GalleryResponse
+}
+
 export async function uploadPhotos(files: File[]) {
   const form = new FormData()
   for (const file of files) {

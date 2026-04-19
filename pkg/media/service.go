@@ -285,6 +285,14 @@ func (s *Service) syncFile(absPath string) (uint, error) {
 }
 
 func (s *Service) Gallery(ctx context.Context) (GalleryResponse, error) {
+	return s.gallery(ctx, false)
+}
+
+func (s *Service) AdminGallery(ctx context.Context) (GalleryResponse, error) {
+	return s.gallery(ctx, true)
+}
+
+func (s *Service) gallery(ctx context.Context, includeHidden bool) (GalleryResponse, error) {
 	var photos []models.Photo
 
 	s.dbMu.RLock()
@@ -303,7 +311,7 @@ func (s *Service) Gallery(ctx context.Context) (GalleryResponse, error) {
 	items := make([]GalleryItem, 0, len(photos))
 	for _, photo := range photos {
 		item := s.toGalleryItem(photo)
-		if item.Hidden {
+		if item.Hidden && !includeHidden {
 			continue
 		}
 		items = append(items, item)

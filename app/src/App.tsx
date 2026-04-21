@@ -10,14 +10,17 @@ import { useTheme } from './hooks/useTheme'
 import { fetchAdminGallery, fetchGallery } from './lib/api'
 import type { GalleryItem } from './lib/types'
 
+const MASONRY_STORAGE_KEY = 'gallery-masonry'
+const GROUPED_STORAGE_KEY = 'gallery-grouped'
+
 function App() {
   const { theme, toggleTheme } = useTheme()
   const shellRef = useRef<HTMLDivElement | null>(null)
   const [photos, setPhotos] = useState<GalleryItem[]>([])
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const [isFetching, setIsFetching] = useState(true)
-  const [isMasonry, setIsMasonry] = useState(false)
-  const [isGrouped, setIsGrouped] = useState(true)
+  const [isMasonry, setIsMasonry] = useState(() => getStoredViewFlag(MASONRY_STORAGE_KEY, false))
+  const [isGrouped, setIsGrouped] = useState(() => getStoredViewFlag(GROUPED_STORAGE_KEY, true))
 
   const isAdmin = window.location.pathname.startsWith('/admin')
 
@@ -36,6 +39,20 @@ function App() {
   useEffect(() => {
     void loadGallery()
   }, [isAdmin])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+    window.localStorage.setItem(MASONRY_STORAGE_KEY, String(isMasonry))
+  }, [isMasonry])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+    window.localStorage.setItem(GROUPED_STORAGE_KEY, String(isGrouped))
+  }, [isGrouped])
 
   useEffect(() => {
     if (!shellRef.current || isAdmin) {
@@ -208,3 +225,18 @@ function getTimelineGroup(dateStr?: string | Date): string {
 }
 
 export default App
+
+function getStoredViewFlag(key: string, fallback: boolean) {
+  if (typeof window === 'undefined') {
+    return fallback
+  }
+
+  const stored = window.localStorage.getItem(key)
+  if (stored === "true") {
+    return true
+  }
+  if (stored === "false") {
+    return false
+  }
+  return fallback
+}

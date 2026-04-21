@@ -97,6 +97,7 @@ export function MasonryGallery({ photos, items, onOpen, isMasonry }: MasonryGall
             key={column.key}
             column={column}
             gap={columns.gap}
+            columnWidth={columns.columnWidth}
             onOpen={onOpen}
           />
         ))}
@@ -108,10 +109,12 @@ export function MasonryGallery({ photos, items, onOpen, isMasonry }: MasonryGall
 function VirtualColumn({
   column,
   gap,
+  columnWidth,
   onOpen,
 }: {
   column: MasonryColumn
   gap: number
+  columnWidth: number
   onOpen: (index: number) => void
 }) {
   const parentRef = useRef<HTMLDivElement | null>(null)
@@ -149,6 +152,7 @@ function VirtualColumn({
               virtualItem={virtualItem}
               entry={entry}
               gap={gap}
+              columnWidth={columnWidth}
               scrollMargin={virtualizer.options.scrollMargin}
               onOpen={onOpen}
               measureElement={virtualizer.measureElement}
@@ -164,6 +168,7 @@ function GalleryCard({
   virtualItem,
   entry,
   gap,
+  columnWidth,
   scrollMargin,
   onOpen,
   measureElement,
@@ -171,6 +176,7 @@ function GalleryCard({
   virtualItem: VirtualItem
   entry: MasonryEntry
   gap: number
+  columnWidth: number
   scrollMargin: number
   onOpen: (index: number) => void
   measureElement: (node: Element | null) => void
@@ -228,7 +234,7 @@ function GalleryCard({
             <img
               src={entry.photo.src}
               srcSet={entry.photo.srcSet}
-              sizes={entry.photo.sizes}
+              sizes={columnWidth > 0 ? `${columnWidth}px` : entry.photo.sizes}
               alt={entry.photo.alt}
               loading="lazy"
               decoding="async"

@@ -209,6 +209,8 @@ function GalleryCard({
     return () => observer.disconnect()
   }, [])
 
+  const coverSlotWidth = getCoverSlotWidth(columnWidth, entry.estimatedHeight, entry.photo.width, entry.photo.height)
+
   return (
     <div
       ref={measureElement}
@@ -234,7 +236,7 @@ function GalleryCard({
             <img
               src={entry.photo.src}
               srcSet={entry.photo.srcSet}
-              sizes={columnWidth > 0 ? `${columnWidth}px` : entry.photo.sizes}
+              sizes={coverSlotWidth > 0 ? `${coverSlotWidth}px` : entry.photo.sizes}
               alt={entry.photo.alt}
               loading="lazy"
               decoding="async"
@@ -245,4 +247,13 @@ function GalleryCard({
       </div>
     </div>
   )
+}
+
+function getCoverSlotWidth(containerWidth: number, containerHeight: number, imageWidth: number, imageHeight: number) {
+  if (containerWidth <= 0 || containerHeight <= 0 || imageWidth <= 0 || imageHeight <= 0) {
+    return containerWidth
+  }
+
+  const imageAspect = imageWidth / imageHeight
+  return Math.ceil(Math.max(containerWidth, containerHeight * imageAspect))
 }

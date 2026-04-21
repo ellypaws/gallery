@@ -19,7 +19,7 @@ import (
 	"github.com/gen2brain/heic"
 )
 
-var responsiveWidths = []int{480, 768, 1280, 1800, 2400}
+var responsiveWidths = []int{320, 768, 960, 1280, 1800, 2560, 3200, 3840}
 
 type GeneratedDerivative struct {
 	Variant      string

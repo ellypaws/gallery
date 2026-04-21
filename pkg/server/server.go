@@ -29,6 +29,27 @@ func New(cfg config.Config, logger *log.Logger, mediaService *media.Service) *Ap
 	e.HideBanner = true
 	e.Use(middleware.Recover())
 	e.Use(middleware.Gzip())
+	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
+		LogMethod:   true,
+		LogURI:      true,
+		LogStatus:   true,
+		LogError:    true,
+		LogLatency:  true,
+		HandleError: true,
+		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
+			fields := []any{
+				"method", v.Method,
+				"uri", v.URI,
+				"status", v.Status,
+				"latency", v.Latency,
+			}
+			if v.Error != nil {
+				fields = append(fields, "err", v.Error)
+			}
+			logger.Info("http request", fields...)
+			return nil
+		},
+	}))
 
 	handler := media.NewHandler(cfg, mediaService)
 	e.GET("/healthz", func(c echo.Context) error {

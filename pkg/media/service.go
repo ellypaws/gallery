@@ -436,7 +436,7 @@ func (s *Service) UpdateOverride(ctx context.Context, photoID uint, input PhotoO
 
 	exifRow := photo.Exif
 	exifRow.PhotoID = photo.ID
-	if input.CapturedAt != nil {
+	if input.CapturedAt != nil || input.CapturedAtLocal != nil {
 		exifRow.CapturedAt = capturedAt
 	}
 
@@ -445,22 +445,14 @@ func (s *Service) UpdateOverride(ctx context.Context, photoID uint, input PhotoO
 			return err
 		}
 
-		if input.CapturedAt != nil || input.UpdatedAt != nil {
-			updates := map[string]any{}
-			if input.CapturedAt != nil {
-				updates["taken_at"] = capturedAt
-			}
-			if input.UpdatedAt != nil && updatedAt != nil {
-				updates["updated_at"] = *updatedAt
-			}
-			if len(updates) > 0 {
-				if err := tx.Model(&models.Photo{}).Where("id = ?", photo.ID).UpdateColumns(updates).Error; err != nil {
-					return err
-				}
+		updates := buildPhotoTimestampUpdates(input, capturedAt, updatedAt)
+		if len(updates) > 0 {
+			if err := tx.Model(&models.Photo{}).Where("id = ?", photo.ID).UpdateColumns(updates).Error; err != nil {
+				return err
 			}
 		}
 
-		if input.CapturedAt != nil {
+		if input.CapturedAt != nil || input.CapturedAtLocal != nil {
 			if err := tx.Save(&exifRow).Error; err != nil {
 				return err
 			}
@@ -758,4 +750,15 @@ func timelineGroup(capturedAt *time.Time, updatedAt time.Time) string {
 func localDayNumber(value time.Time) int {
 	year, month, day := value.Date()
 	return int(time.Date(year, month, day, 0, 0, 0, 0, time.Local).Unix() / 86400)
+}
+
+func buildPhotoTimestampUpdates(input PhotoOverrideInput, capturedAt *time.Time, updatedAt *time.Time) map[string]any {
+	updates := map[string]any{}
+	if input.CapturedAt != nil || input.CapturedAtLocal != nil {
+		updates["taken_at"] = capturedAt
+	}
+	if (input.UpdatedAt != nil || input.UpdatedAtLocal != nil) && updatedAt != nil {
+		updates["updated_at"] = *updatedAt
+	}
+	return updates
 }

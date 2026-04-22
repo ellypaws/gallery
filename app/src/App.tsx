@@ -236,8 +236,8 @@ function App() {
         <section className="forum-window forum-main-window forum-animate-in">
           <div className="forum-window-bar forum-window-bar-primary">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="forum-window-badge">EL</span>
-              <span className="truncate text-[12px] font-bold">Elly</span>
+              <span className="forum-window-badge">🐕‍🦺</span>
+              <span className="truncate text-[12px] font-bold">Gallery - {summary.photoCount} items</span>
             </div>
             <div className="forum-window-actions">
               <button
@@ -272,7 +272,7 @@ function App() {
 
           <div className="forum-toolbar-strip">
             <div className="min-w-0 pr-2">
-              <h1 className="forum-heading forum-heading-compact">Elly</h1>
+              <h1 className="forum-heading forum-heading-compact -rotate-2 tracking-tight pointer-events-none relative text-[90px] z-20 -mb-[90px] antialiased drop-shadow-sm shrink-0">Elly</h1>
             </div>
 
             <div className="forum-toolbar-meta">

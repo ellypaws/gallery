@@ -232,7 +232,7 @@ function GalleryCard({
       }}
     >
       <div
-        className="bp-panel group w-full cursor-pointer p-1"
+        className="bp-panel group w-full p-1"
         role="button"
         tabIndex={0}
         onClick={() => onOpen(entry.index)}

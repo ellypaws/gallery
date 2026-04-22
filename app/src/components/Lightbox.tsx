@@ -56,7 +56,7 @@ export function Lightbox({
   const [isDesktopWindow, setIsDesktopWindow] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth >= DESKTOP_BREAKPOINT : false,
   )
-  const [liveRect, setLiveRect] = useState<LightboxRect | null>(null)
+
   const slideDirectionRef = useRef<number>(1)
   const touchStartRef = useRef<{ x: number; y: number } | null>(null)
   const liveRectRef = useRef<LightboxRect | null>(desktopRect)
@@ -124,6 +124,11 @@ export function Lightbox({
     return () => ctx.revert()
   }, [activeIndex])
 
+  const desktopRectRef = useRef(desktopRect)
+  desktopRectRef.current = desktopRect
+  const onRectChangeRef = useRef(onRectChange)
+  onRectChangeRef.current = onRectChange
+
   useEffect(() => {
     if (typeof window === 'undefined') {
       return
@@ -132,20 +137,20 @@ export function Lightbox({
     const syncDesktopWindow = () => {
       const desktop = window.innerWidth >= DESKTOP_BREAKPOINT
       setIsDesktopWindow(desktop)
-      if (desktop && desktopRect) {
-        onRectChange(clampLightboxRect(desktopRect, true), false)
+      const rect = desktopRectRef.current
+      if (desktop && rect) {
+        onRectChangeRef.current(clampLightboxRect(rect, true), false)
       }
     }
 
-    syncDesktopWindow()
     window.addEventListener('resize', syncDesktopWindow)
     return () => window.removeEventListener('resize', syncDesktopWindow)
-  }, [desktopRect, onRectChange])
+  }, [])
 
   useEffect(() => {
     const onPointerMove = (event: PointerEvent) => {
       const dragState = dragStateRef.current
-      if (!dragState || !isDesktopWindow || !desktopRect) {
+      if (!dragState || !isDesktopWindow) {
         return
       }
 
@@ -162,7 +167,6 @@ export function Lightbox({
           true,
         )
         liveRectRef.current = nextRect
-        setLiveRect(nextRect)
         if (frameRef.current) {
           applyLightboxRect(frameRef.current, nextRect)
         }
@@ -171,7 +175,6 @@ export function Lightbox({
 
       const nextRect = clampResizedLightboxRect(dragState.startRect, dragState.mode, dx, dy)
       liveRectRef.current = nextRect
-      setLiveRect(nextRect)
       if (frameRef.current) {
         applyLightboxRect(frameRef.current, nextRect)
       }
@@ -182,12 +185,11 @@ export function Lightbox({
         return
       }
       const dragState = dragStateRef.current
-      const liveRect = liveRectRef.current
+      const finalRect = liveRectRef.current
       dragStateRef.current = null
-      if (dragState && liveRect) {
-        onRectChange(liveRect, dragState.mode !== 'move')
+      if (dragState && finalRect) {
+        onRectChangeRef.current(finalRect, dragState.mode !== 'move')
       }
-      setLiveRect(null)
     }
 
     window.addEventListener('pointermove', onPointerMove)
@@ -196,7 +198,7 @@ export function Lightbox({
       window.removeEventListener('pointermove', onPointerMove)
       window.removeEventListener('pointerup', onPointerUp)
     }
-  }, [desktopRect, isDesktopWindow, onRectChange])
+  }, [isDesktopWindow])
 
   const propertyRows = useMemo(
     () =>
@@ -256,7 +258,6 @@ export function Lightbox({
     }
 
     liveRectRef.current = desktopRect
-    setLiveRect(desktopRect)
     dragStateRef.current = {
       mode: 'move',
       pointerId: event.pointerId,
@@ -275,7 +276,6 @@ export function Lightbox({
     event.preventDefault()
     event.stopPropagation()
     liveRectRef.current = desktopRect
-    setLiveRect(desktopRect)
     dragStateRef.current = {
       mode: direction,
       pointerId: event.pointerId,
@@ -286,7 +286,6 @@ export function Lightbox({
     onFocus()
   }
 
-  const currentRect = liveRect ?? desktopRect
 
   return (
     <div
@@ -309,10 +308,10 @@ export function Lightbox({
             isDesktopWindow
               ? {
                   position: 'absolute',
-                  left: `${currentRect?.x ?? 0}px`,
-                  top: `${currentRect?.y ?? 0}px`,
-                  width: `${currentRect?.width ?? 0}px`,
-                  height: `${currentRect?.height ?? 0}px`,
+                  left: `${desktopRect?.x ?? 0}px`,
+                  top: `${desktopRect?.y ?? 0}px`,
+                  width: `${desktopRect?.width ?? 0}px`,
+                  height: `${desktopRect?.height ?? 0}px`,
                   maxWidth: 'min(1680px, calc(100vw - 16px))',
                 }
               : {
@@ -420,7 +419,7 @@ export function Lightbox({
               </div>
             </section>
 
-            <aside className="forum-scrollbar flex min-h-0 flex-col overflow-y-auto bg-[var(--viewer-panel)] p-2">
+            <aside className="forum-scrollbar flex min-h-0 flex-col overflow-y-auto bg-[var(--viewer-panel)] p-2" style={{ overscrollBehavior: 'contain' }}>
               <div className="forum-meta-box">
                 <p className="m-0 mb-2 text-[11px] font-bold text-[var(--viewer-ink)]">Properties</p>
                 <dl className="forum-meta-table text-[11px]">

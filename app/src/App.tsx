@@ -227,9 +227,7 @@ function App() {
       ? lightboxWindows.reduce((top, windowItem) => (windowItem.zIndex > top.zIndex ? windowItem : top)).id
       : null
   const shouldDimBackground = lightboxWindows.length > 0 && !lightboxWindows.some((windowItem) => windowItem.isCustomSized)
-  const isGalleryScrollLocked = lightboxWindows.length > 0
   const sortedWindows = [...lightboxWindows].sort((a, b) => a.zIndex - b.zIndex)
-  const canCloseFromBackdrop = lightboxWindows.length === 1
 
   return (
     <div ref={shellRef} className="forum-app-shell">
@@ -299,9 +297,7 @@ function App() {
               </div>
             ) : (
               <div
-                className={`forum-scrollbar flex h-full flex-col gap-5 p-2 md:p-3 ${
-                  isGalleryScrollLocked ? 'pointer-events-none overflow-hidden' : 'overflow-y-auto'
-                }`}
+                className="forum-scrollbar flex h-full flex-col gap-5 overflow-y-auto p-2 md:p-3"
               >
                 {groupedPhotos.map((group, index) => (
                   <section key={group.label || `group-${index}`} className="flex flex-col gap-2">
@@ -324,12 +320,7 @@ function App() {
       {lightboxWindows.length > 0 ? (
         <div className="forum-window-layer pointer-events-none fixed inset-0 z-[60]">
           <div
-            className={`pointer-events-auto absolute inset-0 transition-colors duration-150 ${shouldDimBackground ? 'bg-[rgba(8,10,14,0.2)]' : 'bg-transparent'}`}
-            onClick={() => {
-              if (canCloseFromBackdrop && topWindowId !== null) {
-                closeWindow(topWindowId)
-              }
-            }}
+            className={`pointer-events-none absolute inset-0 transition-colors duration-150 ${shouldDimBackground ? 'bg-[rgba(8,10,14,0.2)]' : 'bg-transparent'}`}
           />
           {sortedWindows.map((windowItem) => (
             <Lightbox

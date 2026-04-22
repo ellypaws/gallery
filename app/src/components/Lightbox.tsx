@@ -371,7 +371,6 @@ export function Lightbox({
             top: `${desktopRect?.y ?? 0}px`,
             width: `${desktopRect?.width ?? 0}px`,
             height: `${desktopRect?.height ?? 0}px`,
-            maxWidth: 'min(1680px, calc(100vw - 16px))',
           }}
         >
           <div

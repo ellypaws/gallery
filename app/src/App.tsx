@@ -156,10 +156,11 @@ function App() {
   }
 
   function openPhotoWindow(index: number) {
+    const photo = photos[index]
     setLightboxWindows((current) => {
       const id = nextWindowIdRef.current++
       const zIndex = ++nextZIndexRef.current
-      const desktopRect = getNextDesktopLightboxRect(current, lastCustomDesktopRect)
+      const desktopRect = getNextDesktopLightboxRect(current, lastCustomDesktopRect, photo?.width ?? 0, photo?.height ?? 0)
       const isDesktop = typeof window !== 'undefined' ? window.innerWidth >= 1024 : false
 
       return [
@@ -419,13 +420,15 @@ type LightboxWindowState = {
 function getNextDesktopLightboxRect(
   current: LightboxWindowState[],
   lastCustomDesktopRect: DesktopLightboxRect | null,
+  photoWidth: number,
+  photoHeight: number,
 ): DesktopLightboxRect | null {
   if (typeof window === 'undefined' || window.innerWidth < 1024) {
     return null
   }
 
   if (current.length === 0) {
-    return getLargeCenteredDesktopLightboxRect()
+    return getAspectAwareDesktopLightboxRect(photoWidth, photoHeight)
   }
 
   if (lastCustomDesktopRect) {
@@ -437,15 +440,52 @@ function getNextDesktopLightboxRect(
     return offsetDesktopLightboxRect(topWindow.desktopRect)
   }
 
-  return offsetDesktopLightboxRect(getLargeCenteredDesktopLightboxRect())
+  return offsetDesktopLightboxRect(getAspectAwareDesktopLightboxRect(photoWidth, photoHeight))
 }
 
-function getLargeCenteredDesktopLightboxRect(): DesktopLightboxRect {
-  const width = Math.min(Math.max(1240, window.innerWidth - 160), 1600)
-  const height = Math.min(Math.max(780, window.innerHeight - 120), 960)
+const SIDEBAR_WIDTH = 280
+const TOOLBAR_HEIGHT = 60
+const VIEWPORT_PADDING = 32
+const MIN_WINDOW_WIDTH = 880
+const MIN_WINDOW_HEIGHT = 620
+
+function getAspectAwareDesktopLightboxRect(photoWidth: number, photoHeight: number): DesktopLightboxRect {
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const maxWidth = vw - VIEWPORT_PADDING * 2
+  const maxHeight = vh - VIEWPORT_PADDING * 2
+
+  if (!photoWidth || !photoHeight) {
+    const width = Math.max(MIN_WINDOW_WIDTH, maxWidth)
+    const height = Math.max(MIN_WINDOW_HEIGHT, maxHeight)
+    return {
+      x: Math.max(16, Math.round((vw - width) / 2)),
+      y: Math.max(16, Math.round((vh - height) / 2)),
+      width,
+      height,
+    }
+  }
+
+  const imageAspect = photoWidth / photoHeight
+  const availImageWidth = maxWidth - SIDEBAR_WIDTH
+  const availImageHeight = maxHeight - TOOLBAR_HEIGHT
+
+  let imageW: number
+  let imageH: number
+  if (imageAspect > availImageWidth / availImageHeight) {
+    imageW = availImageWidth
+    imageH = imageW / imageAspect
+  } else {
+    imageH = availImageHeight
+    imageW = imageH * imageAspect
+  }
+
+  const width = Math.max(MIN_WINDOW_WIDTH, Math.min(maxWidth, Math.round(imageW + SIDEBAR_WIDTH)))
+  const height = Math.max(MIN_WINDOW_HEIGHT, Math.min(maxHeight, Math.round(imageH + TOOLBAR_HEIGHT)))
+
   return {
-    x: Math.max(16, Math.round((window.innerWidth - width) / 2)),
-    y: Math.max(16, Math.round((window.innerHeight - height) / 2)),
+    x: Math.max(16, Math.round((vw - width) / 2)),
+    y: Math.max(16, Math.round((vh - height) / 2)),
     width,
     height,
   }

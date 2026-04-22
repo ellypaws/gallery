@@ -3,8 +3,8 @@ import { gsap } from 'gsap'
 import { Calendar, Grid, LayoutDashboard, MoonStar, SunMedium } from 'lucide-react'
 
 import { AdminPanel } from './components/AdminPanel'
-import DarkVeil from './components/DarkVeil'
 import { Lightbox } from './components/Lightbox'
+import { LoadingDial } from './components/LoadingDial'
 import { MasonryGallery } from './components/MasonryGallery'
 import { useTheme } from './hooks/useTheme'
 import { fetchAdminGallery, fetchGallery } from './lib/api'
@@ -16,19 +16,21 @@ const GROUPED_STORAGE_KEY = 'gallery-grouped'
 function App() {
   const { theme, toggleTheme } = useTheme()
   const shellRef = useRef<HTMLDivElement | null>(null)
+  const nextWindowIdRef = useRef(1)
+  const nextZIndexRef = useRef(10)
   const [photos, setPhotos] = useState<GalleryItem[]>([])
-  const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const [isFetching, setIsFetching] = useState(true)
-  const [isMasonry, setIsMasonry] = useState(() => getStoredViewFlag(MASONRY_STORAGE_KEY, false))
+  const [isMasonry, setIsMasonry] = useState(() => getStoredViewFlag(MASONRY_STORAGE_KEY, true))
   const [isGrouped, setIsGrouped] = useState(() => getStoredViewFlag(GROUPED_STORAGE_KEY, true))
+  const [lightboxWindows, setLightboxWindows] = useState<LightboxWindowState[]>([])
+  const [lastCustomDesktopRect, setLastCustomDesktopRect] = useState<DesktopLightboxRect | null>(null)
 
   const isAdmin = window.location.pathname.startsWith('/admin')
 
   async function loadGallery() {
     setIsFetching(true)
     try {
-      const response = isAdmin ? await fetchAdminGallery() : await fetchGallery()
-      setPhotos(response.photos)
+      setPhotos(await loadGalleryPhotos(isAdmin))
     } catch {
       setPhotos([])
     } finally {
@@ -37,7 +39,31 @@ function App() {
   }
 
   useEffect(() => {
-    void loadGallery()
+    let cancelled = false
+
+    const run = async () => {
+      setIsFetching(true)
+      try {
+        const nextPhotos = await loadGalleryPhotos(isAdmin)
+        if (!cancelled) {
+          setPhotos(nextPhotos)
+        }
+      } catch {
+        if (!cancelled) {
+          setPhotos([])
+        }
+      } finally {
+        if (!cancelled) {
+          setIsFetching(false)
+        }
+      }
+    }
+
+    void run()
+
+    return () => {
+      cancelled = true
+    }
   }, [isAdmin])
 
   useEffect(() => {
@@ -61,20 +87,20 @@ function App() {
 
     const ctx = gsap.context(() => {
       gsap.fromTo(
-        '.hero-copy',
-        { autoAlpha: 0, y: 30 },
-        { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' },
+        '.forum-animate-in',
+        { autoAlpha: 0, y: 18 },
+        { autoAlpha: 1, y: 0, duration: 0.42, stagger: 0.06, ease: 'power2.out' },
       )
     }, shellRef)
 
     return () => ctx.revert()
-  }, [isAdmin, photos.length])
+  }, [isAdmin, photos.length, isFetching])
 
   function animateThemeToggle() {
     gsap.fromTo(
       '.theme-switch',
-      { scale: 0.94, rotate: -8 },
-      { scale: 1, rotate: 0, duration: 0.35, ease: 'back.out(1.5)' },
+      { scale: 0.96, y: 1 },
+      { scale: 1, y: 0, duration: 0.2, ease: 'power2.out' },
     )
     toggleTheme()
   }
@@ -82,113 +108,246 @@ function App() {
   function animateGroupToggle() {
     gsap.fromTo(
       '.group-switch',
-      { scale: 0.94, y: 2 },
-      { scale: 1, y: 0, duration: 0.35, ease: 'back.out(1.5)' },
+      { scale: 0.96, y: 1 },
+      { scale: 1, y: 0, duration: 0.2, ease: 'power2.out' },
     )
-    setIsGrouped((g) => !g)
+    setIsGrouped((value) => !value)
   }
 
   function animateLayoutToggle() {
     gsap.fromTo(
       '.layout-switch',
-      { scale: 0.94, y: 2 },
-      { scale: 1, y: 0, duration: 0.35, ease: 'back.out(1.5)' },
+      { scale: 0.96, y: 1 },
+      { scale: 1, y: 0, duration: 0.2, ease: 'power2.out' },
     )
-    setIsMasonry((m) => !m)
+    setIsMasonry((value) => !value)
   }
 
   const groupedPhotos = useMemo<{ label: string; items: { globalIndex: number; photo: GalleryItem }[] }[]>(() => {
     if (!isGrouped) {
-      return [{ label: '', items: photos.map((photo, i) => ({ photo, globalIndex: i })) }]
+      return [{ label: '', items: photos.map((photo, index) => ({ photo, globalIndex: index })) }]
     }
 
     const map = new Map<string, { photo: GalleryItem; globalIndex: number }[]>()
     const order: string[] = []
 
-    photos.forEach((photo, i) => {
+    photos.forEach((photo, index) => {
       const label = photo.timelineGroup || getTimelineGroup(photo.capturedAt || photo.updatedAt)
       if (!map.has(label)) {
         map.set(label, [])
         order.push(label)
       }
-      map.get(label)!.push({ photo, globalIndex: i })
+      map.get(label)!.push({ photo, globalIndex: index })
     })
 
     return order.map((label) => ({ label, items: map.get(label)! }))
   }, [photos, isGrouped])
 
+  const summary = useMemo(
+    () => ({
+      photoCount: photos.length,
+      groupCount: groupedPhotos.filter((group) => group.items.length > 0).length,
+    }),
+    [groupedPhotos, photos.length],
+  )
+
   if (isAdmin) {
     return <AdminPanel photos={photos} onRefresh={loadGallery} />
   }
 
+  function openPhotoWindow(index: number) {
+    setLightboxWindows((current) => {
+      const id = nextWindowIdRef.current++
+      const zIndex = ++nextZIndexRef.current
+      const desktopRect = getNextDesktopLightboxRect(current, lastCustomDesktopRect)
+      const isDesktop = typeof window !== 'undefined' ? window.innerWidth >= 1024 : false
+
+      return [
+        ...current,
+        {
+          id,
+          activeIndex: index,
+          zIndex,
+          desktopRect: isDesktop ? desktopRect : null,
+          isCustomSized: isDesktop ? current.length > 0 && lastCustomDesktopRect !== null : false,
+        },
+      ]
+    })
+  }
+
+  function closeWindow(id: number) {
+    setLightboxWindows((current) => current.filter((windowItem) => windowItem.id !== id))
+  }
+
+  function focusWindow(id: number) {
+    setLightboxWindows((current) => {
+      const currentWindow = current.find((windowItem) => windowItem.id === id)
+      if (!currentWindow) {
+        return current
+      }
+
+      const zIndex = ++nextZIndexRef.current
+      return current.map((windowItem) => (windowItem.id === id ? { ...windowItem, zIndex } : windowItem))
+    })
+  }
+
+  function updateWindowRect(id: number, rect: DesktopLightboxRect, isCustomSized: boolean) {
+    setLightboxWindows((current) =>
+      current.map((windowItem) =>
+        windowItem.id === id
+          ? {
+              ...windowItem,
+              desktopRect: rect,
+              isCustomSized: isCustomSized || windowItem.isCustomSized,
+            }
+          : windowItem,
+      ),
+    )
+
+    if (isCustomSized) {
+      setLastCustomDesktopRect(rect)
+    }
+  }
+
+  function setWindowPhoto(id: number, updater: (currentIndex: number) => number) {
+    setLightboxWindows((current) =>
+      current.map((windowItem) =>
+        windowItem.id === id
+          ? {
+              ...windowItem,
+              activeIndex: updater(windowItem.activeIndex),
+            }
+          : windowItem,
+      ),
+    )
+  }
+
+  const topWindowId =
+    lightboxWindows.length > 0
+      ? lightboxWindows.reduce((top, windowItem) => (windowItem.zIndex > top.zIndex ? windowItem : top)).id
+      : null
+  const shouldDimBackground = lightboxWindows.length > 0 && !lightboxWindows.some((windowItem) => windowItem.isCustomSized)
+  const isGalleryScrollLocked = lightboxWindows.length > 0
+  const sortedWindows = [...lightboxWindows].sort((a, b) => a.zIndex - b.zIndex)
+  const canCloseFromBackdrop = lightboxWindows.length === 1
+
   return (
-    <div ref={shellRef} className="relative min-h-screen">
-      <div className="pointer-events-none absolute left-0 top-0 z-0 h-[80vh] max-h-[800px] min-h-[400px] w-full overflow-hidden opacity-60 [mask-image:linear-gradient(to_bottom,black_40%,transparent_100%)]">
-        <DarkVeil speed={0.2} noiseIntensity={0.08} />
-      </div>
-
-      <div className="fixed right-4 top-4 z-40 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={animateGroupToggle}
-          className={`group-switch inline-flex h-11 w-11 items-center justify-center rounded-md border transition ${isGrouped ? 'border-[var(--accent)] bg-[var(--accent)] text-white shadow-[0_4px_12px_rgba(201,118,74,0.3)]' : 'border-[var(--line)] bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow)] hover:border-[var(--accent)]'}`}
-          aria-label="Toggle grouping"
-        >
-          <Calendar className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={animateLayoutToggle}
-          className="layout-switch inline-flex h-11 w-11 items-center justify-center rounded-md border border-[var(--line)] bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow)] transition hover:border-[var(--accent)]"
-          aria-label="Toggle layout"
-        >
-          {isMasonry ? <LayoutDashboard className="h-4 w-4" /> : <Grid className="h-4 w-4" />}
-        </button>
-        <button
-          type="button"
-          onClick={animateThemeToggle}
-          className="theme-switch inline-flex h-11 w-11 items-center justify-center rounded-md border border-[var(--line)] bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow)] transition hover:border-[var(--accent)]"
-          aria-label="Toggle theme"
-        >
-          {theme === 'dark' ? <SunMedium className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
-        </button>
-      </div>
-
-      <main className="relative z-10 px-4 pb-8 pt-4 md:px-8 md:pt-6">
-        <section className="mx-auto max-w-[1540px]">
-          <h1 className="hero-copy pointer-events-none font-teko text-[288px] max-xl:text-[220px] max-lg:text-[160px] max-md:text-[120px] max-sm:text-[96px] font-bold text-[var(--hero-title)] tracking-tight leading-[0.8] -mb-[80px] max-md:-mb-[30px] drop-shadow-sm text-left antialiased block w-full max-w-[1200px] break-words relative z-20 -rotate-2 origin-left">
-            Elly
-          </h1>
-        </section>
-
-        <section className="mx-auto mt-6 max-w-[1540px]">
-          {isFetching ? (
-            <div className="min-h-[60vh]" />
-          ) : (
-            <div className="flex flex-col gap-12">
-              {groupedPhotos.map((group, index) => (
-                <div key={group.label} className="w-full">
-                  {group.label && (
-                    <h2 className={`mb-6 font-teko text-3xl font-medium tracking-wide text-[var(--text)] opacity-80 md:text-4xl ${index === 0 ? 'text-right' : ''}`}>
-                      {group.label}
-                    </h2>
-                  )}
-                  <MasonryGallery items={group.items} onOpen={setActiveIndex} isMasonry={isMasonry} />
-                </div>
-              ))}
+    <div ref={shellRef} className="forum-app-shell">
+      <div className="forum-page">
+        <section className="forum-window forum-main-window forum-animate-in">
+          <div className="forum-window-bar forum-window-bar-primary">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="forum-window-badge">EL</span>
+              <span className="truncate text-[12px] font-bold">Elly</span>
             </div>
-          )}
-        </section>
-      </main>
+            <div className="forum-window-actions">
+              <button
+                type="button"
+                onClick={animateLayoutToggle}
+                className="forum-icon-button layout-switch"
+                aria-label={isMasonry ? 'Switch to aligned layout' : 'Switch to masonry layout'}
+                aria-pressed={isMasonry}
+              >
+                {isMasonry ? <LayoutDashboard className="h-3.5 w-3.5" /> : <Grid className="h-3.5 w-3.5" />}
+              </button>
+              <button
+                type="button"
+                onClick={animateGroupToggle}
+                className="forum-icon-button group-switch"
+                aria-label={isGrouped ? 'Disable grouping' : 'Enable grouping'}
+                aria-pressed={isGrouped}
+              >
+                <Calendar className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={animateThemeToggle}
+                className="forum-icon-button theme-switch"
+                aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                aria-pressed={theme === 'dark'}
+              >
+                {theme === 'dark' ? <SunMedium className="h-3.5 w-3.5" /> : <MoonStar className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+          </div>
 
-      {activeIndex !== null ? (
-        <Lightbox
-          photos={photos}
-          activeIndex={activeIndex}
-          onClose={() => setActiveIndex(null)}
-          onPrev={() => setActiveIndex((current) => (current === null ? 0 : (current - 1 + photos.length) % photos.length))}
-          onNext={() => setActiveIndex((current) => (current === null ? 0 : (current + 1) % photos.length))}
-        />
+          <div className="forum-toolbar-strip">
+            <div className="min-w-0 pr-2">
+              <h1 className="forum-heading forum-heading-compact">Elly</h1>
+            </div>
+
+            <div className="forum-toolbar-meta">
+              <span>{summary.photoCount} items</span>
+              {isGrouped ? (
+                <>
+                  <span className="forum-toolbar-separator" />
+                  <span>{summary.groupCount} groups</span>
+                </>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="forum-content-frame">
+            {isFetching ? (
+              <div className="forum-empty-state flex min-h-[320px] flex-col items-center justify-center gap-3">
+                <LoadingDial />
+                <p className="m-0 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-soft)]">Loading</p>
+              </div>
+            ) : photos.length === 0 ? (
+              <div className="forum-empty-state">
+                <p className="m-0 text-sm font-bold text-[var(--text-strong)]">No photos available</p>
+              </div>
+            ) : (
+              <div
+                className={`forum-scrollbar flex h-full flex-col gap-5 p-2 md:p-3 ${
+                  isGalleryScrollLocked ? 'pointer-events-none overflow-hidden' : 'overflow-y-auto'
+                }`}
+              >
+                {groupedPhotos.map((group, index) => (
+                  <section key={group.label || `group-${index}`} className="flex flex-col gap-2">
+                    {group.label ? (
+                      <div className="forum-group-heading">
+                        <span>{group.label}</span>
+                        <span>{group.items.length}</span>
+                      </div>
+                    ) : null}
+
+                    <MasonryGallery items={group.items} onOpen={openPhotoWindow} isMasonry={isMasonry} />
+                  </section>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+
+      {lightboxWindows.length > 0 ? (
+        <div className="forum-window-layer pointer-events-none fixed inset-0 z-[60]">
+          <div
+            className={`pointer-events-auto absolute inset-0 transition-colors duration-150 ${shouldDimBackground ? 'bg-[rgba(8,10,14,0.2)]' : 'bg-transparent'}`}
+            onClick={() => {
+              if (canCloseFromBackdrop && topWindowId !== null) {
+                closeWindow(topWindowId)
+              }
+            }}
+          />
+          {sortedWindows.map((windowItem) => (
+            <Lightbox
+              key={windowItem.id}
+              windowId={windowItem.id}
+              photos={photos}
+              activeIndex={windowItem.activeIndex}
+              zIndex={windowItem.zIndex}
+              desktopRect={windowItem.desktopRect}
+              isActive={windowItem.id === topWindowId}
+              onFocus={() => focusWindow(windowItem.id)}
+              onRectChange={(rect, customSized) => updateWindowRect(windowItem.id, rect, customSized)}
+              onClose={() => closeWindow(windowItem.id)}
+              onPrev={() => setWindowPhoto(windowItem.id, (current) => (current - 1 + photos.length) % photos.length)}
+              onNext={() => setWindowPhoto(windowItem.id, (current) => (current + 1) % photos.length)}
+            />
+          ))}
+        </div>
       ) : null}
     </div>
   )
@@ -200,7 +359,7 @@ function getTimelineGroup(dateStr?: string | Date): string {
   if (isNaN(date.getTime())) return 'Long time ago'
 
   const now = new Date()
-  const dropTime = (d: Date) => Math.floor((d.getTime() - d.getTimezoneOffset() * 60000) / 86400000)
+  const dropTime = (value: Date) => Math.floor((value.getTime() - value.getTimezoneOffset() * 60000) / 86400000)
   const today = dropTime(now)
   const target = dropTime(date)
   const diffDays = today - target
@@ -232,11 +391,76 @@ function getStoredViewFlag(key: string, fallback: boolean) {
   }
 
   const stored = window.localStorage.getItem(key)
-  if (stored === "true") {
+  if (stored === 'true') {
     return true
   }
-  if (stored === "false") {
+  if (stored === 'false') {
     return false
   }
   return fallback
+}
+
+async function loadGalleryPhotos(isAdmin: boolean) {
+  const response = isAdmin ? await fetchAdminGallery() : await fetchGallery()
+  return response.photos
+}
+
+type DesktopLightboxRect = {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+type LightboxWindowState = {
+  id: number
+  activeIndex: number
+  zIndex: number
+  desktopRect: DesktopLightboxRect | null
+  isCustomSized: boolean
+}
+
+function getNextDesktopLightboxRect(
+  current: LightboxWindowState[],
+  lastCustomDesktopRect: DesktopLightboxRect | null,
+): DesktopLightboxRect | null {
+  if (typeof window === 'undefined' || window.innerWidth < 1024) {
+    return null
+  }
+
+  if (current.length === 0) {
+    return getLargeCenteredDesktopLightboxRect()
+  }
+
+  if (lastCustomDesktopRect) {
+    return offsetDesktopLightboxRect(lastCustomDesktopRect)
+  }
+
+  const topWindow = current.reduce((top, windowItem) => (windowItem.zIndex > top.zIndex ? windowItem : top))
+  if (topWindow.desktopRect) {
+    return offsetDesktopLightboxRect(topWindow.desktopRect)
+  }
+
+  return offsetDesktopLightboxRect(getLargeCenteredDesktopLightboxRect())
+}
+
+function getLargeCenteredDesktopLightboxRect(): DesktopLightboxRect {
+  const width = Math.min(Math.max(1240, window.innerWidth - 160), 1600)
+  const height = Math.min(Math.max(780, window.innerHeight - 120), 960)
+  return {
+    x: Math.max(16, Math.round((window.innerWidth - width) / 2)),
+    y: Math.max(16, Math.round((window.innerHeight - height) / 2)),
+    width,
+    height,
+  }
+}
+
+function offsetDesktopLightboxRect(rect: DesktopLightboxRect): DesktopLightboxRect {
+  if (typeof window === 'undefined') {
+    return rect
+  }
+
+  const x = Math.min(Math.max(0, rect.x + 24), Math.max(0, window.innerWidth - rect.width))
+  const y = Math.min(Math.max(0, rect.y + 24), Math.max(0, window.innerHeight - rect.height))
+  return { ...rect, x, y }
 }

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { gsap } from 'gsap'
-import { Aperture, Camera, ChevronLeft, ChevronRight, Clock3, Search, X } from 'lucide-react'
+import { Aperture, Camera, ChevronLeft, ChevronRight, Clock3, ExternalLink, Search, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 import type { GalleryItem } from '../lib/types'
@@ -8,8 +8,14 @@ import { LoadingDial } from './LoadingDial'
 import { ZoomableImage } from './ZoomableImage'
 
 type LightboxProps = {
+  windowId: number
   photos: GalleryItem[]
   activeIndex: number
+  zIndex: number
+  desktopRect: LightboxRect | null
+  isActive: boolean
+  onFocus: () => void
+  onRectChange: (rect: LightboxRect, isCustomSized: boolean) => void
   onClose: () => void
   onPrev: () => void
   onNext: () => void
@@ -21,25 +27,66 @@ type MetaRow = {
   value: string
   kind?: 'camera' | 'lens' | 'iso'
   icon?: LucideIcon
-  isAperture?: boolean
 }
 
-export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: LightboxProps) {
+type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
+
+const DESKTOP_BREAKPOINT = 1024
+const LIGHTBOX_MIN_WIDTH = 880
+const LIGHTBOX_MIN_HEIGHT = 620
+
+export function Lightbox({
+  windowId,
+  photos,
+  activeIndex,
+  zIndex,
+  desktopRect,
+  isActive,
+  onFocus,
+  onRectChange,
+  onClose,
+  onPrev,
+  onNext,
+}: LightboxProps) {
   const overlayRef = useRef<HTMLDivElement | null>(null)
+  const frameRef = useRef<HTMLDivElement | null>(null)
   const photo = photos[activeIndex]
-  const [assetURL, setAssetURL] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
-  const [loadingProgress, setLoadingProgress] = useState<number | null>(null)
-  const [metaStyle, setMetaStyle] = useState({ maxHeight: 1000, opacity: 1, maskImage: 'none' })
-
-  const imgContainerRef = useRef<HTMLDivElement>(null)
-  const mobileMetaRef = useRef<HTMLDivElement>(null)
-  const desktopMetaRef = useRef<HTMLElement>(null)
-
+  const assetURL = photo.originalSrc || photo.src
+  const [loadedPhotoId, setLoadedPhotoId] = useState<number | null>(null)
+  const [isDesktopWindow, setIsDesktopWindow] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth >= DESKTOP_BREAKPOINT : false,
+  )
+  const [liveRect, setLiveRect] = useState<LightboxRect | null>(null)
   const slideDirectionRef = useRef<number>(1)
   const touchStartRef = useRef<{ x: number; y: number } | null>(null)
+  const liveRectRef = useRef<LightboxRect | null>(desktopRect)
+  const dragStateRef = useRef<
+    | {
+        mode: 'move' | ResizeDirection
+        pointerId: number
+        startX: number
+        startY: number
+        startRect: LightboxRect
+      }
+    | null
+  >(null)
+  const isLoading = loadedPhotoId !== photo.id
+
+  useLayoutEffect(() => {
+    if (dragStateRef.current) {
+      return
+    }
+    liveRectRef.current = desktopRect
+    if (isDesktopWindow && desktopRect && frameRef.current) {
+      applyLightboxRect(frameRef.current, desktopRect)
+    }
+  }, [desktopRect, isDesktopWindow])
 
   useEffect(() => {
+    if (!isActive) {
+      return
+    }
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
       if (event.key === 'ArrowLeft') {
@@ -53,30 +100,24 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
     }
 
     window.addEventListener('keydown', onKeyDown)
-    document.body.style.overflow = 'hidden'
-    
+
     return () => {
       window.removeEventListener('keydown', onKeyDown)
-      document.body.style.overflow = ''
     }
-  }, [onClose, onNext, onPrev])
+  }, [isActive, onClose, onNext, onPrev])
 
   useEffect(() => {
-    if (!overlayRef.current) {
+    if (!overlayRef.current || !frameRef.current) {
       return
     }
 
-    const dir = slideDirectionRef.current
+    const frame = frameRef.current
+    const direction = slideDirectionRef.current
     const ctx = gsap.context(() => {
       gsap.fromTo(
-        '.lightbox-panel',
-        { autoAlpha: 0, x: dir * 40, scale: 0.98 },
-        { autoAlpha: 1, x: 0, scale: 1, duration: 0.35, ease: 'power3.out' },
-      )
-      gsap.fromTo(
-        '.lightbox-meta-row',
-        { autoAlpha: 0, x: dir * 10 },
-        { autoAlpha: 1, x: 0, duration: 0.28, stagger: 0.04, delay: 0.1, ease: 'power2.out' },
+        frame.querySelectorAll('.lightbox-detail-row'),
+        { autoAlpha: 0, x: direction * 10 },
+        { autoAlpha: 1, x: 0, duration: 0.18, stagger: 0.025, delay: 0.04, ease: 'power2.out' },
       )
     }, overlayRef)
 
@@ -84,101 +125,114 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
   }, [activeIndex])
 
   useEffect(() => {
-    function updateLayout() {
-      if (!imgContainerRef.current) return
-      const rect = imgContainerRef.current.getBoundingClientRect()
-      const W = rect.width
-      const H = rect.height
-      if (W === 0 || H === 0) return
-
-      const imgRatio = photo.width / photo.height
-      const containerRatio = W / H
-
-      let imgW, imgH
-      if (imgRatio > containerRatio) {
-        imgW = W
-        imgH = W / imgRatio
-      } else {
-        imgH = H
-        imgW = H * imgRatio
-      }
-
-      const spaceLeftInContainer = (W - imgW) / 2
-      const spaceBottomInContainer = (H - imgH) / 2
-
-      const imgLeftAbsolute = rect.left + spaceLeftInContainer
-      const imgBottomAbsolute = window.innerHeight - rect.bottom + spaceBottomInContainer
-
-      const isMobile = window.innerWidth < 768
-
-      let computedMaxHeight = 0
-      if (isMobile) {
-        computedMaxHeight = imgBottomAbsolute - 20 // placed at bottom-5 (20px)
-      } else {
-        if (imgLeftAbsolute > 288) {
-          computedMaxHeight = window.innerHeight - 64 // placed at bottom-8 (32px), with 32px top padding
-        } else {
-          computedMaxHeight = imgBottomAbsolute - 32
-        }
-      }
-
-      const safeMaxHeight = Math.floor(Math.max(0, computedMaxHeight))
-
-      let contentHeight = 0
-      if (isMobile && mobileMetaRef.current) {
-        contentHeight = mobileMetaRef.current.scrollHeight
-      } else if (!isMobile && desktopMetaRef.current) {
-        contentHeight = desktopMetaRef.current.scrollHeight
-      }
-
-      let mask = 'none'
-      if (contentHeight > 0 && safeMaxHeight < contentHeight) {
-        mask = 'linear-gradient(to bottom, black calc(100% - 30px), transparent 100%)'
-      }
-
-      setMetaStyle({
-        maxHeight: safeMaxHeight,
-        opacity: safeMaxHeight < 40 ? 0 : 1,
-        maskImage: mask,
-      })
+    if (typeof window === 'undefined') {
+      return
     }
 
-    updateLayout()
-    window.addEventListener('resize', updateLayout)
-    return () => window.removeEventListener('resize', updateLayout)
-  }, [photo.width, photo.height, activeIndex])
+    const syncDesktopWindow = () => {
+      const desktop = window.innerWidth >= DESKTOP_BREAKPOINT
+      setIsDesktopWindow(desktop)
+      if (desktop && desktopRect) {
+        onRectChange(clampLightboxRect(desktopRect, true), false)
+      }
+    }
+
+    syncDesktopWindow()
+    window.addEventListener('resize', syncDesktopWindow)
+    return () => window.removeEventListener('resize', syncDesktopWindow)
+  }, [desktopRect, onRectChange])
 
   useEffect(() => {
-    setIsLoading(true)
-    setLoadingProgress(null) // Indeterminate fallback
-    const sourceURL = photo.originalSrc || photo.src
-    setAssetURL(sourceURL)
-  }, [photo.id, photo.originalSrc, photo.src])
+    const onPointerMove = (event: PointerEvent) => {
+      const dragState = dragStateRef.current
+      if (!dragState || !isDesktopWindow || !desktopRect) {
+        return
+      }
 
-  const metaRows = useMemo(
-    (): MetaRow[] =>
+      const dx = event.clientX - dragState.startX
+      const dy = event.clientY - dragState.startY
+
+      if (dragState.mode === 'move') {
+        const nextRect = clampLightboxRect(
+          {
+            ...dragState.startRect,
+            x: dragState.startRect.x + dx,
+            y: dragState.startRect.y + dy,
+          },
+          true,
+        )
+        liveRectRef.current = nextRect
+        setLiveRect(nextRect)
+        if (frameRef.current) {
+          applyLightboxRect(frameRef.current, nextRect)
+        }
+        return
+      }
+
+      const nextRect = clampResizedLightboxRect(dragState.startRect, dragState.mode, dx, dy)
+      liveRectRef.current = nextRect
+      setLiveRect(nextRect)
+      if (frameRef.current) {
+        applyLightboxRect(frameRef.current, nextRect)
+      }
+    }
+
+    const onPointerUp = (event: PointerEvent) => {
+      if (dragStateRef.current?.pointerId !== event.pointerId) {
+        return
+      }
+      const dragState = dragStateRef.current
+      const liveRect = liveRectRef.current
+      dragStateRef.current = null
+      if (dragState && liveRect) {
+        onRectChange(liveRect, dragState.mode !== 'move')
+      }
+      setLiveRect(null)
+    }
+
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
+    }
+  }, [desktopRect, isDesktopWindow, onRectChange])
+
+  const propertyRows = useMemo(
+    () =>
       [
-        { key: 'camera', label: 'Camera', value: photo.camera, kind: 'camera' as const },
-        { key: 'lens', label: 'Lens', value: photo.lens, kind: 'lens' as const },
-        { key: 'aperture', label: 'Aperture', value: photo.aperture, icon: Aperture, isAperture: true },
-        { key: 'shutter', label: 'Shutter', value: photo.shutter, icon: Clock3 },
-        { key: 'iso', label: 'ISO', value: photo.iso, kind: 'iso' as const },
-        { key: 'focal', label: 'Focal Length', value: photo.focalLength, icon: Search },
+        { label: 'File', value: getPhotoLabel(photo) },
+        { label: 'Date', value: formatDateTime(photo.capturedAt || photo.updatedAt) },
+        { label: 'Dimensions', value: `${photo.width} x ${photo.height}` },
+        { label: 'Path', value: photo.relativePath },
       ].filter((row) => row.value),
     [photo],
   )
 
-  const handleTouchStart = (e: React.TouchEvent) => {
+  const metaRows = useMemo(() => {
+    const rows: MetaRow[] = [
+      { key: 'camera', label: 'Camera', value: photo.camera, kind: 'camera' },
+      { key: 'lens', label: 'Lens', value: photo.lens, kind: 'lens' },
+      { key: 'aperture', label: 'Aperture', value: photo.aperture, icon: Aperture },
+      { key: 'shutter', label: 'Shutter', value: photo.shutter, icon: Clock3 },
+      { key: 'iso', label: 'ISO', value: photo.iso, kind: 'iso' },
+      { key: 'focal', label: 'Focal Len', value: photo.focalLength, icon: Search },
+    ]
+
+    return rows.filter((row) => row.value)
+  }, [photo])
+
+  const handleTouchStart = (event: React.TouchEvent) => {
     touchStartRef.current = {
-      x: e.touches[0].clientX,
-      y: e.touches[0].clientY,
+      x: event.touches[0].clientX,
+      y: event.touches[0].clientY,
     }
   }
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
+  const handleTouchEnd = (event: React.TouchEvent) => {
     if (!touchStartRef.current) return
-    const dx = e.changedTouches[0].clientX - touchStartRef.current.x
-    const dy = e.changedTouches[0].clientY - touchStartRef.current.y
+    const dx = event.changedTouches[0].clientX - touchStartRef.current.x
+    const dy = event.changedTouches[0].clientY - touchStartRef.current.y
     touchStartRef.current = null
 
     if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
@@ -192,60 +246,104 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
     }
   }
 
+  function beginWindowMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (!isDesktopWindow || !desktopRect) {
+      return
+    }
+
+    if ((event.target as HTMLElement).closest('button, a')) {
+      return
+    }
+
+    liveRectRef.current = desktopRect
+    setLiveRect(desktopRect)
+    dragStateRef.current = {
+      mode: 'move',
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startRect: desktopRect,
+    }
+    onFocus()
+  }
+
+  function beginWindowResize(direction: ResizeDirection, event: React.PointerEvent<HTMLButtonElement>) {
+    if (!isDesktopWindow || !desktopRect) {
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    liveRectRef.current = desktopRect
+    setLiveRect(desktopRect)
+    dragStateRef.current = {
+      mode: direction,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startRect: desktopRect,
+    }
+    onFocus()
+  }
+
+  const currentRect = liveRect ?? desktopRect
+
   return (
     <div
       ref={overlayRef}
-      onClick={onClose}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      className="fixed inset-0 z-[60] bg-black/88 px-4 py-4 text-white backdrop-blur-sm md:px-6"
-      role="dialog"
-      aria-modal="true"
-      aria-label={photo.alt}
+      className="pointer-events-none fixed inset-0"
+      style={{ zIndex }}
     >
-      <img
-        src={photo.placeholder || photo.src}
-        alt=""
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover blur-3xl opacity-30"
-      />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_18%,rgba(0,0,0,0.32)_56%,rgba(0,0,0,0.84)_100%)]" />
-
-      <aside
-        ref={desktopMetaRef}
-        className="pointer-events-none absolute left-5 bottom-8 z-10 hidden w-[248px] overflow-hidden transition-opacity duration-300 md:flex md:flex-col"
-        style={{
-          maxHeight: metaStyle.maxHeight,
-          opacity: metaStyle.opacity,
-          maskImage: metaStyle.maskImage,
-          WebkitMaskImage: metaStyle.maskImage,
-        }}
-      >
-        <div className="flex flex-col items-start gap-3">
-          {metaRows.map((row) => (
-            <div key={row.key} className="lightbox-meta-row flex shrink-0 items-start gap-3 text-white/86">
-              <MetaIcon row={row} />
-              <div className="flex flex-col items-start gap-0.5">
-                <span className="text-[11px] uppercase tracking-[0.14em] text-white/42">{row.label}</span>
-                <span className="text-sm leading-5">
-                  {row.isAperture ? (
-                    <>
-                      <span className="italic">f</span>
-                      <span className="ml-0.5">{row.value}</span>
-                    </>
-                  ) : (
-                    row.value
-                  )}
-                </span>
-              </div>
+      <div className="relative h-full w-full">
+        <div
+          ref={frameRef}
+          className="lightbox-frame pointer-events-auto flex min-h-0 w-full flex-col overflow-hidden border border-[var(--viewer-line)] bg-[var(--viewer-panel)] text-[var(--viewer-ink)] shadow-[0_18px_32px_rgba(0,0,0,0.3)]"
+          onPointerDown={onFocus}
+          onWheel={(event) => event.stopPropagation()}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          role="dialog"
+          aria-modal="false"
+          aria-label={photo.alt}
+          style={
+            isDesktopWindow
+              ? {
+                  position: 'absolute',
+                  left: `${currentRect?.x ?? 0}px`,
+                  top: `${currentRect?.y ?? 0}px`,
+                  width: `${currentRect?.width ?? 0}px`,
+                  height: `${currentRect?.height ?? 0}px`,
+                  maxWidth: 'min(1680px, calc(100vw - 16px))',
+                }
+              : {
+                  position: 'absolute',
+                  inset: '8px',
+                }
+          }
+        >
+          <div
+            className={`forum-window-bar forum-window-bar-primary ${isDesktopWindow ? 'cursor-move' : 'cursor-default'}`}
+            style={{ borderBottomColor: 'var(--viewer-line)' }}
+            onPointerDown={beginWindowMove}
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="forum-window-badge">IMG</span>
+              <span className="truncate text-[12px] font-bold">Image Viewer - {getPhotoLabel(photo)}</span>
             </div>
-          ))}
-        </div>
-      </aside>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                onClose()
+              }}
+              className="forum-button lightbox-title-button !min-h-[20px] !px-[6px] !py-[1px]"
+              aria-label="Close"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
 
-      <div className="lightbox-panel mx-auto flex h-full max-w-[1700px] flex-col">
-        <div className="flex min-h-0 flex-1 items-center justify-center">
-          <div className="relative h-full w-full max-w-[1500px] md:max-w-[min(1500px,calc(100vw-3rem))]">
+          <div className="flex flex-wrap items-center gap-1 border-b border-[var(--viewer-line)] bg-[var(--viewer-panel)] px-2 py-1">
             <button
               type="button"
               onClick={(event) => {
@@ -253,11 +351,12 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
                 slideDirectionRef.current = -1
                 onPrev()
               }}
-              className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-md border border-white/15 bg-black/30 p-2 text-white transition hover:border-white/30 hover:bg-black/50"
-              aria-label="Previous photo"
+              className="forum-button"
             >
-              <ChevronLeft className="h-5 w-5" />
+              <ChevronLeft className="h-4 w-4" />
+              <span className="forum-button-label">Prev</span>
             </button>
+
             <button
               type="button"
               onClick={(event) => {
@@ -265,84 +364,246 @@ export function Lightbox({ photos, activeIndex, onClose, onPrev, onNext }: Light
                 slideDirectionRef.current = 1
                 onNext()
               }}
-              className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-md border border-white/15 bg-black/30 p-2 text-white transition hover:border-white/30 hover:bg-black/50"
-              aria-label="Next photo"
+              className="forum-button"
             >
-              <ChevronRight className="h-5 w-5" />
+              <span className="forum-button-label">Next</span>
+              <ChevronRight className="h-4 w-4" />
             </button>
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation()
-                onClose()
-              }}
-              className="absolute right-3 top-3 z-10 rounded-md border border-white/15 bg-black/30 p-2 text-white transition hover:border-white/30 hover:bg-black/50"
-              aria-label="Close"
-            >
-              <X className="h-4 w-4" />
-            </button>
-            {isLoading ? <LoadingDial className="absolute right-3 top-16 z-10 drop-shadow-md" progress={loadingProgress} /> : null}
 
-            <div
-              ref={mobileMetaRef}
-              className="pointer-events-none fixed bottom-5 left-4 z-10 flex w-[280px] flex-col items-start gap-2 overflow-hidden transition-opacity duration-300 md:hidden"
-              style={{
-                maxHeight: metaStyle.maxHeight,
-                opacity: metaStyle.opacity,
-                maskImage: metaStyle.maskImage,
-                WebkitMaskImage: metaStyle.maskImage,
-              }}
-            >
-              {metaRows.map((row) => (
-                <div key={row.key} className="lightbox-meta-row flex shrink-0 items-start gap-3 text-white/86">
-                  <MetaIcon row={row} />
-                  <div className="flex flex-col items-start gap-0.5">
-                    <span className="text-[11px] uppercase tracking-[0.14em] text-white/42">{row.label}</span>
-                    <span className="text-sm leading-5">
-                      {row.isAperture ? (
-                        <>
-                          <span className="italic">f</span>
-                          <span className="ml-0.5">{row.value}</span>
-                        </>
-                      ) : (
-                        row.value
-                      )}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {photo.originalSrc ? (
+              <a
+                href={photo.originalSrc}
+                target="_blank"
+                rel="noreferrer"
+                className="forum-button"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <ExternalLink className="h-4 w-4" />
+                <span className="forum-button-label">Open Original</span>
+              </a>
+            ) : null}
 
-            <div ref={imgContainerRef} className="relative h-full w-full">
-              <ZoomableImage
-                key={photo.id}
-                src={assetURL || photo.placeholder || photo.src}
-                alt={photo.alt}
-                naturalWidth={photo.width}
-                naturalHeight={photo.height}
-                onLoad={() => setIsLoading(false)}
-                className={`transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
-              />
+            <div className="ml-auto text-[10px] uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              {activeIndex + 1} / {photos.length}
             </div>
           </div>
+
+          <div className="grid min-h-0 flex-1 gap-0 md:grid-cols-[minmax(0,1fr)_280px]">
+            <section className="flex min-h-0 flex-col border-b border-[var(--viewer-line)] md:border-b-0 md:border-r">
+              <div className="relative min-h-[320px] flex-1 bg-[var(--bg)] p-2">
+                {isLoading ? (
+                  <div className="pointer-events-none absolute left-4 top-4 z-10">
+                    <LoadingDial />
+                  </div>
+                ) : null}
+
+                <div
+                  className="h-full min-h-[300px] border bg-[var(--panel-ink)]"
+                  style={{
+                    borderTopColor: 'var(--viewer-line)',
+                    borderLeftColor: 'var(--viewer-line)',
+                    borderRightColor: 'var(--bevel-light)',
+                    borderBottomColor: 'var(--bevel-light)',
+                    boxShadow: 'inset 1px 1px 0 var(--bevel-dark)',
+                  }}
+                >
+                  <ZoomableImage
+                    key={photo.id}
+                    src={assetURL || photo.placeholder || photo.src}
+                    alt={photo.alt}
+                    naturalWidth={photo.width}
+                    naturalHeight={photo.height}
+                    onLoad={() => setLoadedPhotoId(photo.id)}
+                    className={`transition-opacity duration-150 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                  />
+                </div>
+              </div>
+            </section>
+
+            <aside className="forum-scrollbar flex min-h-0 flex-col overflow-y-auto bg-[var(--viewer-panel)] p-2">
+              <div className="forum-meta-box">
+                <p className="m-0 mb-2 text-[11px] font-bold text-[var(--viewer-ink)]">Properties</p>
+                <dl className="forum-meta-table text-[11px]">
+                  {propertyRows.map((row) => (
+                    <div key={row.label} className="lightbox-detail-row contents">
+                      <dt className="forum-meta-term">{row.label}</dt>
+                      <dd className="forum-meta-desc">{row.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+
+              {metaRows.length ? (
+                <div className="forum-meta-box mt-2">
+                  <p className="m-0 mb-2 text-[11px] font-bold text-[var(--viewer-ink)]">EXIF Data</p>
+                  <div className="space-y-2">
+                    {metaRows.map((row) => (
+                      <div key={row.key} className="lightbox-detail-row flex items-start gap-2 text-[11px] text-[var(--viewer-ink)]">
+                        <MetaIcon row={row} />
+                        <div className="min-w-0">
+                          <p className="m-0 font-bold text-[var(--text-soft)]">{row.label}</p>
+                          <p className="m-0 break-words">{formatMetaValue(row)}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {photo.description || photo.alt ? (
+                <div className="forum-meta-box mt-2">
+                  <p className="m-0 mb-2 text-[11px] font-bold text-[var(--viewer-ink)]">Notes</p>
+                  {photo.alt ? <p className="m-0 text-[11px] leading-5">{photo.alt}</p> : null}
+                  {photo.description ? <p className="m-0 mt-2 text-[11px] leading-5">{photo.description}</p> : null}
+                </div>
+              ) : null}
+            </aside>
+          </div>
+
+          {isDesktopWindow ? (
+            <>
+              {RESIZE_HANDLES.map((handle) => (
+                <button
+                  key={`${windowId}-${handle.direction}`}
+                  type="button"
+                  className={handle.className}
+                  onPointerDown={(event) => beginWindowResize(handle.direction, event)}
+                  aria-label={`Resize window ${handle.direction}`}
+                />
+              ))}
+            </>
+          ) : null}
         </div>
       </div>
     </div>
   )
 }
 
+type LightboxRect = {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+function clampLightboxRect(rect: LightboxRect, isDesktopWindow: boolean): LightboxRect {
+  if (typeof window === 'undefined' || !isDesktopWindow) {
+    return rect
+  }
+
+  const viewportWidth = window.innerWidth
+  const viewportHeight = window.innerHeight
+  const width = Math.min(Math.max(LIGHTBOX_MIN_WIDTH, rect.width), Math.max(LIGHTBOX_MIN_WIDTH, viewportWidth - 32))
+  const height = Math.min(Math.max(LIGHTBOX_MIN_HEIGHT, rect.height), Math.max(LIGHTBOX_MIN_HEIGHT, viewportHeight - 32))
+  const x = Math.min(Math.max(8, rect.x), Math.max(8, viewportWidth - width - 8))
+  const y = Math.min(Math.max(8, rect.y), Math.max(8, viewportHeight - height - 8))
+
+  return { x, y, width, height }
+}
+
+function clampResizedLightboxRect(startRect: LightboxRect, direction: ResizeDirection, dx: number, dy: number): LightboxRect {
+  const minWidth = LIGHTBOX_MIN_WIDTH
+  const minHeight = LIGHTBOX_MIN_HEIGHT
+
+  const next = { ...startRect }
+
+  if (direction.includes('e')) {
+    next.width = startRect.width + dx
+  }
+  if (direction.includes('s')) {
+    next.height = startRect.height + dy
+  }
+  if (direction.includes('w')) {
+    next.x = startRect.x + dx
+    next.width = startRect.width - dx
+  }
+  if (direction.includes('n')) {
+    next.y = startRect.y + dy
+    next.height = startRect.height - dy
+  }
+
+  if (next.width < minWidth) {
+    if (direction.includes('w')) {
+      next.x -= minWidth - next.width
+    }
+    next.width = minWidth
+  }
+
+  if (next.height < minHeight) {
+    if (direction.includes('n')) {
+      next.y -= minHeight - next.height
+    }
+    next.height = minHeight
+  }
+
+  return clampLightboxRect(next, true)
+}
+
+function applyLightboxRect(element: HTMLDivElement, rect: LightboxRect) {
+  element.style.left = `${rect.x}px`
+  element.style.top = `${rect.y}px`
+  element.style.width = `${rect.width}px`
+  element.style.height = `${rect.height}px`
+}
 
 function MetaIcon({ row }: { row: MetaRow }) {
   if (row.kind === 'iso') {
-    return <img src="/iso.svg" alt="" aria-hidden="true" className="mt-[1px] h-4 w-4 shrink-0 invert brightness-200" />
+    return <img src="/iso.svg" alt="" aria-hidden="true" className="mt-[1px] h-4 w-4 shrink-0" style={{ filter: 'var(--asset-icon-filter)' }} />
   }
   if (row.kind === 'lens') {
-    return <img src="/lens.svg" alt="" aria-hidden="true" className="mt-[1px] h-4 w-4 shrink-0 invert brightness-200" />
+    return <img src="/lens.svg" alt="" aria-hidden="true" className="mt-[1px] h-4 w-4 shrink-0" style={{ filter: 'var(--asset-icon-filter)' }} />
   }
   if (row.kind === 'camera') {
-    return <Camera className="mt-[1px] h-4 w-4 shrink-0 text-white/54" />
+    return <Camera className="mt-[1px] h-4 w-4 shrink-0 text-[var(--viewer-ink)]" />
   }
 
   const Icon = row.icon ?? Camera
-  return <Icon className="mt-[1px] h-4 w-4 shrink-0 text-white/54" />
+  return <Icon className="mt-[1px] h-4 w-4 shrink-0 text-[var(--viewer-ink)]" />
+}
+
+function formatMetaValue(row: MetaRow) {
+  if (row.key === 'aperture') {
+    return `f/${row.value}`
+  }
+  return row.value
+}
+
+const RESIZE_HANDLES: { direction: ResizeDirection; className: string }[] = [
+  { direction: 'n', className: 'lightbox-resize lightbox-resize-n' },
+  { direction: 's', className: 'lightbox-resize lightbox-resize-s' },
+  { direction: 'e', className: 'lightbox-resize lightbox-resize-e' },
+  { direction: 'w', className: 'lightbox-resize lightbox-resize-w' },
+  { direction: 'ne', className: 'lightbox-resize lightbox-resize-ne' },
+  { direction: 'nw', className: 'lightbox-resize lightbox-resize-nw' },
+  { direction: 'se', className: 'lightbox-resize lightbox-resize-se' },
+  { direction: 'sw', className: 'lightbox-resize lightbox-resize-sw' },
+]
+
+function getPhotoLabel(photo: GalleryItem) {
+  const label = photo.title || photo.alt || photo.relativePath
+  if (!label) {
+    return `Photo ${photo.id}`
+  }
+
+  const segments = label.split(/[\\/]/)
+  return segments[segments.length - 1]
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) {
+    return ''
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
 }

@@ -9,7 +9,18 @@ type AdminPanelProps = {
   onRefresh: () => Promise<void>
 }
 
-type DraftMap = Record<number, { title: string; alt: string; description: string; sortOrder: number; hidden: boolean; capturedAt: string; updatedAt: string }>
+type DraftMap = Record<
+  number,
+  {
+    title: string
+    alt: string
+    description: string
+    sortOrder: number
+    hidden: boolean
+    capturedAt: string
+    updatedAt: string
+  }
+>
 
 export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
   const [isBusy, setIsBusy] = useState(false)
@@ -55,8 +66,7 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
       photos.map((photo) => ({
         photo,
         draft:
-          drafts[photo.id] ??
-          {
+          drafts[photo.id] ?? {
             title: photo.title,
             alt: photo.alt,
             description: photo.description,
@@ -129,162 +139,280 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
   }
 
   return (
-    <main className="min-h-screen px-4 py-6 md:px-8">
-      <div className="mx-auto max-w-[1220px]">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.2em] text-[var(--muted)]">Admin</p>
-            <h1 className="mt-2 font-teko text-[72px] leading-[0.9] text-[var(--text)]">Gallery Intake</h1>
+    <main className="forum-app-shell">
+      <div className="forum-page">
+        <section className="forum-window">
+          <div className="forum-window-bar">
+            <div className="forum-window-title">Gallery Intake</div>
+            <div className="forum-window-actions" aria-hidden="true">
+              <span className="forum-window-dot" />
+              <span className="forum-window-dot" />
+              <span className="forum-window-dot" />
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:border-[var(--accent)]">
-              <ImagePlus className="h-4 w-4" />
-              Upload Images
-              <input
-                type="file"
-                accept=".jpg,.jpeg,.png,.heic,.heif"
-                multiple
-                className="hidden"
-                onChange={(event) => void handleUpload(event.target.files)}
-              />
-            </label>
-            <button
-              type="button"
-              onClick={() => void handleRescan()}
-              className="inline-flex items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:border-[var(--accent)]"
-            >
-              <RefreshCcw className="h-4 w-4" />
-              Rescan Library
-            </button>
-          </div>
-        </div>
 
-        <div className="mt-6 flex items-center gap-3 text-sm text-[var(--muted)]">
-          {isBusy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
-          <span>{notice || `${photos.length} indexed photos.`}</span>
-        </div>
+          <div className="forum-panel-body flex flex-col gap-6">
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(320px,1fr)]">
+              <div className="flex flex-col gap-4">
+                <div>
+                  <p className="forum-kicker">Internal Archive Editor</p>
+                  <h1 className="forum-heading">Gallery Intake</h1>
+                  <p className="forum-copy">
+                    Upload new images, rescan the library, and edit titles, dates, ordering, and visibility without leaving the
+                    archive tool.
+                  </p>
+                </div>
 
-        <div className="mt-8 space-y-4">
-          {items.map(({ photo, draft }) => (
-            <article
-              key={photo.id}
-              className="grid gap-4 rounded-md border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[var(--shadow)] lg:grid-cols-[220px_minmax(0,1fr)]"
-            >
-              <div className="overflow-hidden rounded-[6px] border border-[var(--line)]">
-                <img src={photo.src} srcSet={photo.srcSet} sizes="220px" alt={photo.alt} className="aspect-[4/5] w-full object-cover" />
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="flex flex-col gap-2 text-sm text-[var(--muted)]">
-                  Title
-                  <input
-                    value={draft.title}
-                    onChange={(event) =>
-                      setDrafts((current) => ({
-                        ...current,
-                        [photo.id]: { ...draft, title: event.target.value },
-                      }))
-                    }
-                    className="rounded-md border border-[var(--line)] bg-transparent px-3 py-2 text-[var(--text)] outline-none transition focus:border-[var(--accent)]"
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-sm text-[var(--muted)]">
-                  Alt Text
-                  <input
-                    value={draft.alt}
-                    onChange={(event) =>
-                      setDrafts((current) => ({
-                        ...current,
-                        [photo.id]: { ...draft, alt: event.target.value },
-                      }))
-                    }
-                    className="rounded-md border border-[var(--line)] bg-transparent px-3 py-2 text-[var(--text)] outline-none transition focus:border-[var(--accent)]"
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-sm text-[var(--muted)] md:col-span-2">
-                  Description
-                  <textarea
-                    value={draft.description}
-                    onChange={(event) =>
-                      setDrafts((current) => ({
-                        ...current,
-                        [photo.id]: { ...draft, description: event.target.value },
-                      }))
-                    }
-                    rows={4}
-                    className="rounded-md border border-[var(--line)] bg-transparent px-3 py-2 text-[var(--text)] outline-none transition focus:border-[var(--accent)]"
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-sm text-[var(--muted)]">
-                  Sort Order
-                  <input
-                    type="number"
-                    value={draft.sortOrder}
-                    onChange={(event) =>
-                      setDrafts((current) => ({
-                        ...current,
-                        [photo.id]: { ...draft, sortOrder: Number(event.target.value) || 0 },
-                      }))
-                    }
-                    className="rounded-md border border-[var(--line)] bg-transparent px-3 py-2 text-[var(--text)] outline-none transition focus:border-[var(--accent)]"
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-sm text-[var(--muted)]">
-                  Date Taken
-                  <input
-                    type="datetime-local"
-                    value={draft.capturedAt}
-                    onChange={(event) =>
-                      setDrafts((current) => ({
-                        ...current,
-                        [photo.id]: { ...draft, capturedAt: event.target.value },
-                      }))
-                    }
-                    className="rounded-md border border-[var(--line)] bg-transparent px-3 py-2 text-[var(--text)] outline-none transition focus:border-[var(--accent)]"
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-sm text-[var(--muted)]">
-                  Date Modified
-                  <input
-                    type="datetime-local"
-                    value={draft.updatedAt}
-                    onChange={(event) =>
-                      setDrafts((current) => ({
-                        ...current,
-                        [photo.id]: { ...draft, updatedAt: event.target.value },
-                      }))
-                    }
-                    className="rounded-md border border-[var(--line)] bg-transparent px-3 py-2 text-[var(--text)] outline-none transition focus:border-[var(--accent)]"
-                  />
-                </label>
-                <label className="flex items-center gap-3 self-end text-sm text-[var(--text)]">
-                  <input
-                    type="checkbox"
-                    checked={draft.hidden}
-                    onChange={(event) =>
-                      setDrafts((current) => ({
-                        ...current,
-                        [photo.id]: { ...draft, hidden: event.target.checked },
-                      }))
-                    }
-                    className="h-4 w-4 rounded border-[var(--line)] accent-[var(--accent)]"
-                  />
-                  Hidden from public gallery
-                </label>
-                <div className="flex items-end justify-end md:col-span-2">
+                <div className="forum-toolbar">
+                  <label className="forum-button cursor-pointer">
+                    <ImagePlus className="h-4 w-4" />
+                    <span className="flex flex-col items-start leading-tight">
+                      <span className="forum-button-label">Upload Images</span>
+                      <span className="forum-button-note">Add JPG, PNG, HEIC, or HEIF</span>
+                    </span>
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.heic,.heif"
+                      multiple
+                      className="hidden"
+                      onChange={(event) => void handleUpload(event.target.files)}
+                    />
+                  </label>
+
                   <button
                     type="button"
-                    onClick={() => void handleSave(photo.id)}
-                    className="inline-flex items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface-strong)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:border-[var(--accent)]"
+                    onClick={() => void handleRescan()}
+                    className="forum-button"
+                    disabled={isBusy}
                   >
-                    <Save className="h-4 w-4" />
-                    Save
+                    <RefreshCcw className={`h-4 w-4 ${isBusy ? 'animate-spin' : ''}`} />
+                    <span className="flex flex-col items-start leading-tight">
+                      <span className="forum-button-label">Rescan Library</span>
+                      <span className="forum-button-note">Refresh file and EXIF data</span>
+                    </span>
                   </button>
+                </div>
+              </div>
+
+              <div className="forum-stat-grid">
+                <div className="forum-stat-card">
+                  <p className="forum-stat-label">Indexed Photos</p>
+                  <p className="forum-stat-value">{photos.length}</p>
+                </div>
+                <div className="forum-stat-card">
+                  <p className="forum-stat-label">Hidden Entries</p>
+                  <p className="forum-stat-value">{photos.filter((photo) => photo.hidden).length}</p>
+                </div>
+                <div className="forum-stat-card">
+                  <p className="forum-stat-label">Save State</p>
+                  <p className="forum-stat-value">{isBusy ? 'Working' : 'Idle'}</p>
+                </div>
+                <div className="forum-stat-card">
+                  <p className="forum-stat-label">Status</p>
+                  <p className="forum-stat-value">{notice || 'Ready for edits'}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 bg-[linear-gradient(180deg,var(--panel-strong)_0%,var(--panel-soft)_100%)] px-3 py-2 border-t border-l border-t-[var(--bp-border-light)] border-l-[var(--bp-border-light)] border-b border-r border-b-[var(--bp-border-darker)] border-r-[var(--bp-border-darker)] shadow-[inset_1px_1px_0_var(--bp-inset),inset_-1px_-1px_0_var(--bp-border-dark)]">
+              {isBusy ? <LoaderCircle className="h-4 w-4 animate-spin text-[var(--accent-strong)]" /> : null}
+              <span className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--text-soft)]">Session Status</span>
+              <span className="text-sm text-[var(--text-strong)]">{notice || `${photos.length} indexed photos available.`}</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-4">
+          {items.map(({ photo, draft }) => (
+            <article key={photo.id} className="forum-window">
+              <div className="forum-window-bar">
+                <div className="min-w-0">
+                  <div className="forum-window-title truncate">{getPhotoLabel(photo)}</div>
+                  <p className="m-0 mt-1 truncate text-[12px] text-[var(--text-soft)]">{photo.relativePath}</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.12em] text-[var(--text-soft)]">
+                  <span>{photo.width}×{photo.height}</span>
+                  <span className="h-1 w-1 rounded-full bg-[var(--line-strong)]" />
+                  <span>{draft.hidden ? 'Hidden' : 'Public'}</span>
+                </div>
+              </div>
+
+              <div className="forum-panel-body">
+                <div className="grid gap-4 xl:grid-cols-[240px_minmax(0,1fr)]">
+                  <div className="space-y-3">
+                    <div className="overflow-hidden border border-[var(--line-strong)] bg-[var(--panel-ink)] shadow-[inset_1px_1px_0_var(--bp-inset),inset_-1px_-1px_0_var(--bp-border-dark)]">
+                      <img src={photo.src} srcSet={photo.srcSet} sizes="240px" alt={photo.alt} className="aspect-[4/5] w-full object-cover" />
+                    </div>
+
+                    <div className="forum-meta-box">
+                      <dl className="forum-meta-table">
+                        <dt className="forum-meta-term">Captured</dt>
+                        <dd className="forum-meta-desc">{formatDate(photo.capturedAt || photo.updatedAt) || 'Unknown'}</dd>
+                        <dt className="forum-meta-term">Camera</dt>
+                        <dd className="forum-meta-desc">{photo.camera || 'Unknown'}</dd>
+                        <dt className="forum-meta-term">Lens</dt>
+                        <dd className="forum-meta-desc">{photo.lens || 'Unknown'}</dd>
+                      </dl>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <label className="forum-field">
+                      <span className="forum-field-label">Title</span>
+                      <input
+                        value={draft.title}
+                        onChange={(event) =>
+                          setDrafts((current) => ({
+                            ...current,
+                            [photo.id]: { ...draft, title: event.target.value },
+                          }))
+                        }
+                        className="forum-input"
+                      />
+                    </label>
+
+                    <label className="forum-field">
+                      <span className="forum-field-label">Alt Text</span>
+                      <input
+                        value={draft.alt}
+                        onChange={(event) =>
+                          setDrafts((current) => ({
+                            ...current,
+                            [photo.id]: { ...draft, alt: event.target.value },
+                          }))
+                        }
+                        className="forum-input"
+                      />
+                    </label>
+
+                    <label className="forum-field md:col-span-2">
+                      <span className="forum-field-label">Description</span>
+                      <textarea
+                        value={draft.description}
+                        onChange={(event) =>
+                          setDrafts((current) => ({
+                            ...current,
+                            [photo.id]: { ...draft, description: event.target.value },
+                          }))
+                        }
+                        rows={4}
+                        className="forum-input min-h-[120px]"
+                      />
+                    </label>
+
+                    <label className="forum-field">
+                      <span className="forum-field-label">Sort Order</span>
+                      <input
+                        type="number"
+                        value={draft.sortOrder}
+                        onChange={(event) =>
+                          setDrafts((current) => ({
+                            ...current,
+                            [photo.id]: { ...draft, sortOrder: Number(event.target.value) || 0 },
+                          }))
+                        }
+                        className="forum-input"
+                      />
+                    </label>
+
+                    <label className="forum-field">
+                      <span className="forum-field-label">Date Taken</span>
+                      <input
+                        type="datetime-local"
+                        value={draft.capturedAt}
+                        onChange={(event) =>
+                          setDrafts((current) => ({
+                            ...current,
+                            [photo.id]: { ...draft, capturedAt: event.target.value },
+                          }))
+                        }
+                        className="forum-input"
+                      />
+                    </label>
+
+                    <label className="forum-field">
+                      <span className="forum-field-label">Date Modified</span>
+                      <input
+                        type="datetime-local"
+                        value={draft.updatedAt}
+                        onChange={(event) =>
+                          setDrafts((current) => ({
+                            ...current,
+                            [photo.id]: { ...draft, updatedAt: event.target.value },
+                          }))
+                        }
+                        className="forum-input"
+                      />
+                    </label>
+
+                    <label className="forum-field">
+                      <span className="forum-field-label">Visibility</span>
+                      <span
+                        className="flex min-h-[36px] items-center gap-3 bg-[var(--field-fill)] px-3 border-t border-l border-t-[var(--bp-border-darker)] border-l-[var(--bp-border-darker)] border-b border-r border-b-[var(--bp-border-light)] border-r-[var(--bp-border-light)] shadow-[inset_1px_1px_0_var(--bp-border-dark)]"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={draft.hidden}
+                          onChange={(event) =>
+                            setDrafts((current) => ({
+                              ...current,
+                              [photo.id]: { ...draft, hidden: event.target.checked },
+                            }))
+                          }
+                          className="h-4 w-4 accent-[var(--accent)]"
+                        />
+                        <span className="text-sm text-[var(--text-strong)]">Hide from public gallery</span>
+                      </span>
+                    </label>
+
+                    <div className="flex items-end justify-end md:col-span-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleSave(photo.id)}
+                        className="forum-button"
+                        disabled={isBusy}
+                      >
+                        <Save className="h-4 w-4" />
+                        <span className="flex flex-col items-start leading-tight">
+                          <span className="forum-button-label">Save Entry</span>
+                          <span className="forum-button-note">Write changes to archive</span>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </article>
           ))}
-        </div>
+        </section>
       </div>
     </main>
   )
+}
+
+function getPhotoLabel(photo: GalleryItem) {
+  const label = photo.title || photo.alt || photo.relativePath
+  if (!label) {
+    return `Photo ${photo.id}`
+  }
+
+  const segments = label.split(/[\\/]/)
+  return segments[segments.length - 1]
+}
+
+function formatDate(value?: string | null) {
+  if (!value) {
+    return ''
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+  }).format(date)
 }

@@ -3,7 +3,7 @@ import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual'
 
 import type { GalleryItem } from '../lib/types'
 
-const CARD_CAPTION_HEIGHT = 68
+const CARD_CAPTION_HEIGHT = 50
 
 type MasonryGalleryProps = {
   photos?: GalleryItem[]
@@ -231,40 +231,35 @@ function GalleryCard({
         paddingBottom: `${gap}px`,
       }}
     >
-      <div className="w-full">
-        <button
-          type="button"
-          onClick={() => onOpen(entry.index)}
-          className="group block w-full overflow-hidden border border-[var(--line-strong)] bg-[var(--panel)] text-left shadow-[inset_1px_1px_0_var(--bp-inset),inset_-1px_-1px_0_var(--bp-border-dark)] transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-strong)]"
+      <div
+        className="bp-panel group w-full cursor-pointer p-1"
+        role="button"
+        tabIndex={0}
+        onClick={() => onOpen(entry.index)}
+        onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onOpen(entry.index) }}
+      >
+        <div
+          className="bp-inset w-full shrink-0 overflow-hidden"
+          style={{ aspectRatio: entry.aspectRatio }}
         >
-          <div className="border-b border-[var(--line)] bg-[linear-gradient(180deg,var(--panel-strong)_0%,var(--panel-soft)_100%)] px-2 py-1">
-            <div className="flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-soft)]">
-              <span className="truncate">{stamp}</span>
-              <span>{entry.photo.width}×{entry.photo.height}</span>
-            </div>
-          </div>
+          <img
+            src={entry.photo.src}
+            srcSet={entry.photo.srcSet}
+            sizes={coverSlotWidth > 0 ? `${coverSlotWidth}px` : entry.photo.sizes}
+            alt={entry.photo.alt}
+            loading="lazy"
+            decoding="async"
+            className="block h-full w-full object-cover transition-opacity duration-200 group-hover:opacity-90"
+          />
+        </div>
 
-          <div
-            className="relative overflow-hidden border-b border-[var(--line)] bg-[var(--panel-ink)]"
-            style={{
-              aspectRatio: entry.aspectRatio,
-            }}
-          >
-            <img
-              src={entry.photo.src}
-              srcSet={entry.photo.srcSet}
-              sizes={coverSlotWidth > 0 ? `${coverSlotWidth}px` : entry.photo.sizes}
-              alt={entry.photo.alt}
-              loading="lazy"
-              decoding="async"
-              className="h-full w-full object-cover transition duration-200 group-hover:contrast-[1.04] group-hover:saturate-[0.94] group-hover:brightness-[1.02]"
-            />
+        <div className="flex flex-col justify-between px-1 pb-1 pt-2">
+          <p className="m-0 mb-1 truncate text-[11px] font-bold text-[var(--text-strong)]" title={title}>{title}</p>
+          <div className="flex items-center justify-between text-[10px] text-[var(--text-soft)]">
+            <span>{stamp}</span>
+            <span>{entry.photo.width}×{entry.photo.height}</span>
           </div>
-
-          <div className="flex h-[42px] items-center bg-[linear-gradient(180deg,var(--panel-strong)_0%,var(--panel)_100%)] px-3 py-2">
-            <p className="m-0 truncate text-[12px] font-bold text-[var(--text-strong)]">{title}</p>
-          </div>
-        </button>
+        </div>
       </div>
     </div>
   )

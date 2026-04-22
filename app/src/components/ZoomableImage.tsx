@@ -8,9 +8,10 @@ type ZoomableImageProps = {
   naturalHeight: number
   className?: string
   onLoad?: () => void
+  hideControls?: boolean
 }
 
-export function ZoomableImage({ src, alt, naturalWidth, naturalHeight, className, onLoad }: ZoomableImageProps) {
+export function ZoomableImage({ src, alt, naturalWidth, naturalHeight, className, onLoad, hideControls }: ZoomableImageProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
   const minimapViewportRef = useRef<HTMLDivElement>(null)
@@ -200,71 +201,73 @@ export function ZoomableImage({ src, alt, naturalWidth, naturalHeight, className
         style={{ willChange: 'transform', imageOrientation: 'from-image' }}
       />
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-[linear-gradient(180deg,transparent_0%,rgba(0,0,0,0.58)_100%)] p-3">
-        <div className="pointer-events-auto flex flex-wrap items-center gap-2">
-          <div className="forum-button">
-            <span className="forum-button-label">Zoom</span>
-            <span className="forum-button-note">{zoomPercent}%</span>
-          </div>
-
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation()
-              applyScale(target.current.scale - 0.5)
-            }}
-            className="forum-button"
-          >
-            <ZoomOut className="h-4 w-4" />
-            <span className="forum-button-label">Out</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation()
-              applyScale(target.current.scale + 0.5)
-            }}
-            className="forum-button"
-          >
-            <ZoomIn className="h-4 w-4" />
-            <span className="forum-button-label">In</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation()
-              resetZoom()
-            }}
-            className="forum-button"
-          >
-            <RotateCcw className="h-4 w-4" />
-            <span className="forum-button-label">Reset</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleZoomToggle}
-            className="forum-button"
-          >
-            <span className="forum-button-label">{isZoomed ? 'Fit View' : 'Actual Size'}</span>
-          </button>
-        </div>
-
-        {isZoomed ? (
-          <div className="bp-panel pointer-events-auto mt-3 inline-flex flex-col gap-2 p-2 shadow-xl bg-[rgba(0,0,0,0.36)]">
-            <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/70">View Window</span>
-            <div className="bp-inset relative overflow-hidden bg-black/55">
-              <img src={src} alt="" aria-hidden="true" className="h-20 w-auto max-w-[150px] object-contain opacity-60" />
-              <div
-                ref={minimapViewportRef}
-                className="pointer-events-none absolute border border-white/90 bg-white/10 shadow-[0_0_0_999px_rgba(0,0,0,0.35)]"
-              />
+      {!hideControls ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-[linear-gradient(180deg,transparent_0%,rgba(0,0,0,0.58)_100%)] p-3">
+          <div className="pointer-events-auto flex flex-wrap items-center gap-2">
+            <div className="forum-button">
+              <span className="forum-button-label">Zoom</span>
+              <span className="forum-button-note">{zoomPercent}%</span>
             </div>
+
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                applyScale(target.current.scale - 0.5)
+              }}
+              className="forum-button"
+            >
+              <ZoomOut className="h-4 w-4" />
+              <span className="forum-button-label">Out</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                applyScale(target.current.scale + 0.5)
+              }}
+              className="forum-button"
+            >
+              <ZoomIn className="h-4 w-4" />
+              <span className="forum-button-label">In</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                resetZoom()
+              }}
+              className="forum-button"
+            >
+              <RotateCcw className="h-4 w-4" />
+              <span className="forum-button-label">Reset</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleZoomToggle}
+              className="forum-button"
+            >
+              <span className="forum-button-label">{isZoomed ? 'Fit View' : 'Actual Size'}</span>
+            </button>
           </div>
-        ) : null}
-      </div>
+
+          {isZoomed ? (
+            <div className="bp-panel pointer-events-auto mt-3 inline-flex flex-col gap-2 p-2 shadow-xl bg-[rgba(0,0,0,0.36)]">
+              <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/70">View Window</span>
+              <div className="bp-inset relative overflow-hidden bg-black/55">
+                <img src={src} alt="" aria-hidden="true" className="h-20 w-auto max-w-[150px] object-contain opacity-60" />
+                <div
+                  ref={minimapViewportRef}
+                  className="pointer-events-none absolute border border-white/90 bg-white/10 shadow-[0_0_0_999px_rgba(0,0,0,0.35)]"
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }

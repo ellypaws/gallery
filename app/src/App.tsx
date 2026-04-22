@@ -21,7 +21,7 @@ function App() {
   const [photos, setPhotos] = useState<GalleryItem[]>([])
   const [isFetching, setIsFetching] = useState(true)
   const [isMasonry, setIsMasonry] = useState(() => getStoredViewFlag(MASONRY_STORAGE_KEY, true))
-  const [isGrouped, setIsGrouped] = useState(() => getStoredViewFlag(GROUPED_STORAGE_KEY, true))
+  const [isGrouped, setIsGrouped] = useState(() => getStoredViewFlag(GROUPED_STORAGE_KEY, false))
   const [lightboxWindows, setLightboxWindows] = useState<LightboxWindowState[]>([])
   const [lastCustomDesktopRect, setLastCustomDesktopRect] = useState<DesktopLightboxRect | null>(null)
 
@@ -320,7 +320,12 @@ function App() {
       {lightboxWindows.length > 0 ? (
         <div className="forum-window-layer pointer-events-none fixed inset-0 z-[60]">
           <div
-            className={`pointer-events-none absolute inset-0 transition-colors duration-150 ${shouldDimBackground ? 'bg-[rgba(8,10,14,0.2)]' : 'bg-transparent'}`}
+            className={`absolute inset-0 transition-colors duration-150 ${lightboxWindows.length === 1 ? 'pointer-events-auto cursor-default' : 'pointer-events-none'} ${shouldDimBackground ? 'bg-[rgba(8,10,14,0.2)]' : 'bg-transparent'}`}
+            onClick={() => {
+              if (lightboxWindows.length === 1 && topWindowId !== null) {
+                closeWindow(topWindowId)
+              }
+            }}
           />
           {sortedWindows.map((windowItem) => (
             <Lightbox

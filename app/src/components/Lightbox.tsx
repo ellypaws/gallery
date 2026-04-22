@@ -237,7 +237,7 @@ export function Lightbox({
     const dy = event.changedTouches[0].clientY - touchStartRef.current.y
     touchStartRef.current = null
 
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+    if (Math.abs(dx) > Math.abs(dy) * 2 && Math.abs(dx) > 80) {
       if (dx < 0) {
         slideDirectionRef.current = 1
         onNext()
@@ -286,6 +286,67 @@ export function Lightbox({
     onFocus()
   }
 
+  if (!isDesktopWindow) {
+    return (
+      <div
+        ref={overlayRef}
+        className="pointer-events-auto fixed inset-0 z-[100] flex flex-col bg-[var(--bg)]"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        role="dialog"
+        aria-label={photo.alt}
+      >
+        <div ref={frameRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto" style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}>
+          <div className="relative shrink-0 bg-[var(--panel-ink)]" style={{ aspectRatio: `${photo.width} / ${photo.height}`, maxHeight: '80vh' }}>
+            {isLoading ? (
+              <div className="pointer-events-none absolute left-4 top-4 z-10">
+                <LoadingDial />
+              </div>
+            ) : null}
+
+            <div className="absolute inset-0">
+              <ZoomableImage
+                key={photo.id}
+                src={assetURL || photo.placeholder || photo.src}
+                alt={photo.alt}
+                naturalWidth={photo.width}
+                naturalHeight={photo.height}
+                onLoad={() => setLoadedPhotoId(photo.id)}
+                className={`transition-opacity duration-150 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                hideControls
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="forum-button lightbox-title-button absolute right-2 top-2 z-20 !min-h-[28px] !px-[8px]"
+              aria-label="Close"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {metaRows.length > 0 ? (
+            <div className="shrink-0 p-2">
+              <div className="bp-panel p-2">
+                <p className="m-0 mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-soft)]">EXIF</p>
+                <div className="flex flex-wrap gap-x-5 gap-y-2">
+                  {metaRows.map((row) => (
+                    <div key={row.key} className="lightbox-detail-row flex items-center gap-1.5 text-[11px] text-[var(--text)]">
+                      <MetaIcon row={row} />
+                      <span className="font-bold text-[var(--text-soft)]">{row.label}</span>
+                      <span className="text-[var(--text-strong)]">{formatMetaValue(row)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div
@@ -304,24 +365,17 @@ export function Lightbox({
           role="dialog"
           aria-modal="false"
           aria-label={photo.alt}
-          style={
-            isDesktopWindow
-              ? {
-                  position: 'absolute',
-                  left: `${desktopRect?.x ?? 0}px`,
-                  top: `${desktopRect?.y ?? 0}px`,
-                  width: `${desktopRect?.width ?? 0}px`,
-                  height: `${desktopRect?.height ?? 0}px`,
-                  maxWidth: 'min(1680px, calc(100vw - 16px))',
-                }
-              : {
-                  position: 'absolute',
-                  inset: '8px',
-                }
-          }
+          style={{
+            position: 'absolute',
+            left: `${desktopRect?.x ?? 0}px`,
+            top: `${desktopRect?.y ?? 0}px`,
+            width: `${desktopRect?.width ?? 0}px`,
+            height: `${desktopRect?.height ?? 0}px`,
+            maxWidth: 'min(1680px, calc(100vw - 16px))',
+          }}
         >
           <div
-            className={`forum-window-bar forum-window-bar-primary ${isDesktopWindow ? 'cursor-move' : 'cursor-default'}`}
+            className="forum-window-bar forum-window-bar-primary cursor-move"
             style={{ borderBottomColor: 'var(--viewer-line)' }}
             onPointerDown={beginWindowMove}
           >
@@ -387,8 +441,8 @@ export function Lightbox({
             </div>
           </div>
 
-          <div className="grid min-h-0 flex-1 gap-0 md:grid-cols-[minmax(0,1fr)_280px]">
-            <section className="flex min-h-0 flex-col border-b border-[var(--viewer-line)] md:border-b-0 md:border-r">
+          <div className="grid min-h-0 flex-1 gap-0 grid-cols-[minmax(0,1fr)_280px]">
+            <section className="flex min-h-0 flex-col border-r border-[var(--viewer-line)]">
               <div className="relative min-h-[320px] flex-1 bg-[var(--bg)] p-2">
                 {isLoading ? (
                   <div className="pointer-events-none absolute left-4 top-4 z-10">
@@ -459,19 +513,17 @@ export function Lightbox({
             </aside>
           </div>
 
-          {isDesktopWindow ? (
-            <>
-              {RESIZE_HANDLES.map((handle) => (
-                <button
-                  key={`${windowId}-${handle.direction}`}
-                  type="button"
-                  className={handle.className}
-                  onPointerDown={(event) => beginWindowResize(handle.direction, event)}
-                  aria-label={`Resize window ${handle.direction}`}
-                />
-              ))}
-            </>
-          ) : null}
+          <>
+            {RESIZE_HANDLES.map((handle) => (
+              <button
+                key={`${windowId}-${handle.direction}`}
+                type="button"
+                className={handle.className}
+                onPointerDown={(event) => beginWindowResize(handle.direction, event)}
+                aria-label={`Resize window ${handle.direction}`}
+              />
+            ))}
+          </>
         </div>
       </div>
     </div>

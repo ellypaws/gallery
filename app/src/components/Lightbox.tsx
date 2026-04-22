@@ -374,7 +374,7 @@ export function Lightbox({
           }}
         >
           <div
-            className="forum-window-bar forum-window-bar-primary cursor-move"
+            className="forum-window-bar forum-window-bar-primary"
             style={{ borderBottomColor: 'var(--viewer-line)' }}
             onPointerDown={beginWindowMove}
           >

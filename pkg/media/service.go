@@ -182,7 +182,13 @@ func (s *Service) syncFile(absPath string) (uint, error) {
 		return photo.ID, nil
 	}
 
-	s.logger.Info("processing new image", "path", relPath, "hash", hash)
+	modified := photo.ID != 0 && photo.Hash != "" && photo.Hash != hash
+	previousPhoto := photo
+	if modified {
+		s.logger.Info("processing modified image", "path", relPath, "old_hash", photo.Hash, "hash", hash)
+	} else {
+		s.logger.Info("processing new image", "path", relPath, "hash", hash)
+	}
 
 	exifMeta, err := images.ExtractExif(absPath)
 	if err != nil {
@@ -286,6 +292,10 @@ func (s *Service) syncFile(absPath string) (uint, error) {
 
 	if err != nil {
 		return 0, err
+	}
+
+	if modified {
+		s.removeCachedPhotoAssets(previousPhoto)
 	}
 
 	return photo.ID, nil
@@ -595,6 +605,13 @@ func (s *Service) deletePhoto(photo models.Photo) error {
 		return err
 	}
 
+	s.removeCachedPhotoAssets(photo)
+
+	s.logger.Info("removed missing image", "path", photo.RelativePath, "hash", photo.Hash)
+	return nil
+}
+
+func (s *Service) removeCachedPhotoAssets(photo models.Photo) {
 	cachePaths := make([]string, 0, len(photo.Derivatives)+1)
 	for _, derivative := range photo.Derivatives {
 		cachePaths = append(cachePaths, filepath.Join(s.cfg.CacheDir, filepath.FromSlash(derivative.RelativePath)))
@@ -608,9 +625,6 @@ func (s *Service) deletePhoto(photo models.Photo) error {
 			s.logger.Warn("failed to remove cached derivative", "path", cachePath, "err", err)
 		}
 	}
-
-	s.logger.Info("removed missing image", "path", photo.RelativePath, "hash", photo.Hash)
-	return nil
 }
 
 func normalizeRelativePath(path string) string {

@@ -513,6 +513,56 @@ code {
     color: var(--text-soft);
   }
 
+  .bar-loader {
+    min-width: 214px;
+    color: var(--text-soft);
+  }
+
+  .bar-loader-track {
+    display: grid;
+    grid-template-columns: repeat(18, minmax(0, 1fr));
+    gap: 2px;
+    width: 190px;
+    height: 20px;
+    padding: 3px;
+    background: var(--field-fill);
+  }
+
+  .bar-loader-segment {
+    min-width: 0;
+    background:
+      linear-gradient(90deg, rgba(255, 255, 255, 0.55), transparent 48%),
+      linear-gradient(180deg, #9fea8d 0%, #31bc38 45%, #0f8e1d 100%);
+    border-right: 1px solid rgba(0, 64, 0, 0.24);
+    opacity: 0;
+    transform: scaleY(0.72);
+    transform-origin: center;
+    animation: bar-loader-reveal 1ms linear forwards;
+  }
+
+  .bar-loader-label {
+    display: block;
+    margin: 0;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  @keyframes bar-loader-reveal {
+    from {
+      opacity: 0;
+      transform: scaleY(0.72);
+    }
+
+    to {
+      opacity: 1;
+      transform: scaleY(1);
+    }
+  }
+
   .forum-meta-grid {
     display: grid;
     gap: 10px;

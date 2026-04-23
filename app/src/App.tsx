@@ -4,8 +4,8 @@ import { Calendar, Grid, LayoutDashboard, MoonStar, SunMedium } from 'lucide-rea
 
 import { AdminPanel } from './components/AdminPanel'
 import { Lightbox } from './components/Lightbox'
-import { LoadingDial } from './components/LoadingDial'
 import { MasonryGallery } from './components/MasonryGallery'
+import { BarLoader } from './components/BarLoader.tsx'
 import { useTheme } from './hooks/useTheme'
 import { fetchAdminGallery, fetchGallery } from './lib/api'
 import type { GalleryItem } from './lib/types'
@@ -289,9 +289,8 @@ function App() {
 
           <div className="forum-content-frame">
             {isFetching ? (
-              <div className="forum-empty-state flex min-h-[320px] flex-col items-center justify-center gap-3">
-                <LoadingDial />
-                <p className="m-0 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-soft)]">Loading</p>
+              <div className="forum-empty-state flex min-h-[320px] items-center justify-center">
+                <BarLoader label="Loading" />
               </div>
             ) : photos.length === 0 ? (
               <div className="forum-empty-state">

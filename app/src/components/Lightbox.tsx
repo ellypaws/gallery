@@ -4,7 +4,7 @@ import { Aperture, Camera, ChevronLeft, ChevronRight, Clock3, ExternalLink, Sear
 import type { LucideIcon } from 'lucide-react'
 
 import type { GalleryItem } from '../lib/types'
-import { LoadingDial } from './LoadingDial'
+import { BarLoader } from './BarLoader.tsx'
 import { ZoomableImage } from './ZoomableImage'
 
 type LightboxProps = {
@@ -299,8 +299,8 @@ export function Lightbox({
         <div ref={frameRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto" style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}>
           <div className="relative shrink-0 bg-[var(--panel-ink)]" style={{ aspectRatio: `${photo.width} / ${photo.height}`, maxHeight: '80vh' }}>
             {isLoading ? (
-              <div className="pointer-events-none absolute left-4 top-4 z-10">
-                <LoadingDial />
+              <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                <BarLoader />
               </div>
             ) : null}
 
@@ -443,14 +443,8 @@ export function Lightbox({
           <div className="grid min-h-0 flex-1 gap-0 grid-cols-[minmax(0,1fr)_280px]">
             <section className="flex min-h-0 flex-col border-r border-[var(--viewer-line)]">
               <div className="relative min-h-[320px] flex-1 bg-[var(--bg)] p-2">
-                {isLoading ? (
-                  <div className="pointer-events-none absolute left-4 top-4 z-10">
-                    <LoadingDial />
-                  </div>
-                ) : null}
-
                 <div
-                  className="h-full min-h-[300px] border bg-[var(--panel-ink)]"
+                  className="relative h-full min-h-[300px] border bg-[var(--panel-ink)]"
                   style={{
                     borderTopColor: 'var(--viewer-line)',
                     borderLeftColor: 'var(--viewer-line)',
@@ -459,6 +453,12 @@ export function Lightbox({
                     boxShadow: 'inset 1px 1px 0 var(--bevel-dark)',
                   }}
                 >
+                  {isLoading ? (
+                    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                      <BarLoader />
+                    </div>
+                  ) : null}
+
                   <ZoomableImage
                     key={photo.id}
                     src={assetURL || photo.placeholder || photo.src}

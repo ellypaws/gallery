@@ -188,7 +188,7 @@ export function Lightbox({
       const finalRect = liveRectRef.current
       dragStateRef.current = null
       if (dragState && finalRect) {
-        onRectChangeRef.current(finalRect, dragState.mode !== 'move')
+        onRectChangeRef.current(finalRect, !isSameLightboxRect(finalRect, dragState.startRect))
       }
     }
 
@@ -594,6 +594,10 @@ function applyLightboxRect(element: HTMLDivElement, rect: LightboxRect) {
   element.style.top = `${rect.y}px`
   element.style.width = `${rect.width}px`
   element.style.height = `${rect.height}px`
+}
+
+function isSameLightboxRect(a: LightboxRect, b: LightboxRect) {
+  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height
 }
 
 function MetaIcon({ row }: { row: MetaRow }) {

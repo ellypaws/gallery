@@ -228,6 +228,7 @@ function App() {
       ? lightboxWindows.reduce((top, windowItem) => (windowItem.zIndex > top.zIndex ? windowItem : top)).id
       : null
   const shouldDimBackground = lightboxWindows.length > 0 && !lightboxWindows.some((windowItem) => windowItem.isCustomSized)
+  const canCloseFromBackdrop = lightboxWindows.length === 1 && shouldDimBackground
   const sortedWindows = [...lightboxWindows].sort((a, b) => a.zIndex - b.zIndex)
 
   return (
@@ -321,9 +322,9 @@ function App() {
       {lightboxWindows.length > 0 ? (
         <div className="forum-window-layer pointer-events-none fixed inset-0 z-[60]">
           <div
-            className={`absolute inset-0 transition-colors duration-150 ${lightboxWindows.length === 1 ? 'pointer-events-auto cursor-default' : 'pointer-events-none'} ${shouldDimBackground ? 'bg-[rgba(8,10,14,0.2)]' : 'bg-transparent'}`}
+            className={`absolute inset-0 transition-colors duration-150 ${canCloseFromBackdrop ? 'pointer-events-auto cursor-default' : 'pointer-events-none'} ${shouldDimBackground ? 'bg-[rgba(8,10,14,0.2)]' : 'bg-transparent'}`}
             onClick={() => {
-              if (lightboxWindows.length === 1 && topWindowId !== null) {
+              if (canCloseFromBackdrop && topWindowId !== null) {
                 closeWindow(topWindowId)
               }
             }}

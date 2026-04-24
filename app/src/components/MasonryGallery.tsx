@@ -257,10 +257,12 @@ function GalleryCard({
         <div className="flex flex-col justify-between px-1 pb-1 pt-2">
           <div className="mb-1 flex min-w-0 items-center justify-between gap-2">
             <p className="m-0 min-w-0 truncate text-[11px] font-bold text-[var(--text-strong)]" title={title}>{title}</p>
-            <span className={`inline-flex shrink-0 items-center gap-1 text-[10px] font-bold ${entry.photo.starred ? 'text-[var(--text-strong)]' : 'text-[var(--text-soft)]'}`}>
-              <Star className={`h-3 w-3 ${entry.photo.starred ? 'fill-current' : ''}`} />
-              <span>{formatCount(entry.photo.starCount)}</span>
-            </span>
+            {entry.photo.starCount > 0 ? (
+              <span className={`inline-flex shrink-0 items-center gap-1 text-[10px] font-bold ${entry.photo.starred ? 'text-[var(--text-strong)]' : 'text-[var(--text-soft)]'}`}>
+                <Star className={`h-3 w-3 ${entry.photo.starred ? 'fill-current' : ''}`} />
+                <span>{formatCount(entry.photo.starCount)}</span>
+              </span>
+            ) : null}
           </div>
           <div className="flex items-center justify-between gap-2 text-[10px] text-[var(--text-soft)]">
             <span>{stamp}</span>

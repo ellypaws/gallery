@@ -1,11 +1,14 @@
 package media
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"gallery/pkg/config"
 	"gallery/pkg/utils"
@@ -23,7 +26,7 @@ func NewHandler(cfg config.Config, service *Service) *Handler {
 }
 
 func (h *Handler) GetGallery(c echo.Context) error {
-	response, err := h.service.Gallery(c.Request().Context())
+	response, err := h.service.Gallery(c.Request().Context(), viewerHash(c))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
@@ -31,7 +34,7 @@ func (h *Handler) GetGallery(c echo.Context) error {
 }
 
 func (h *Handler) GetAdminGallery(c echo.Context) error {
-	response, err := h.service.AdminGallery(c.Request().Context())
+	response, err := h.service.AdminGallery(c.Request().Context(), viewerHash(c))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
@@ -94,7 +97,7 @@ func (h *Handler) Rescan(c echo.Context) error {
 }
 
 func (h *Handler) PatchPhoto(c echo.Context) error {
-	idValue, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	photoID, err := parsePhotoID(c)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid photo id")
 	}
@@ -104,9 +107,54 @@ func (h *Handler) PatchPhoto(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid payload")
 	}
 
-	if err := h.service.UpdateOverride(c.Request().Context(), uint(idValue), input); err != nil {
+	if err := h.service.UpdateOverride(c.Request().Context(), photoID, input); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
 	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) TrackView(c echo.Context) error {
+	photoID, err := parsePhotoID(c)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid photo id")
+	}
+
+	interaction, err := h.service.TrackView(c.Request().Context(), photoID, viewerHash(c))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	return c.JSON(http.StatusOK, interaction)
+}
+
+func (h *Handler) ToggleStar(c echo.Context) error {
+	photoID, err := parsePhotoID(c)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid photo id")
+	}
+
+	interaction, err := h.service.ToggleStar(c.Request().Context(), photoID, viewerHash(c))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	return c.JSON(http.StatusOK, interaction)
+}
+
+func parsePhotoID(c echo.Context) (uint, error) {
+	idValue, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return uint(idValue), nil
+}
+
+func viewerHash(c echo.Context) string {
+	ip := strings.TrimSpace(c.RealIP())
+	if ip == "" {
+		ip = strings.TrimSpace(c.Request().RemoteAddr)
+	}
+	sum := sha256.Sum256([]byte(ip))
+	return hex.EncodeToString(sum[:])
 }

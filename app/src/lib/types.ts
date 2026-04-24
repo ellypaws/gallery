@@ -24,6 +24,9 @@ export type GalleryItem = {
   sortOrder: number
   hidden: boolean
   relativePath: string
+  viewCount: number
+  starCount: number
+  starred: boolean
 }
 
 export type GalleryResponse = {
@@ -41,4 +44,11 @@ export type PhotoPatchPayload = {
   updated_at?: string
   captured_at_local?: string | null
   updated_at_local?: string
+}
+
+export type GalleryInteraction = {
+  photoId: number
+  viewCount: number
+  starCount: number
+  starred: boolean
 }

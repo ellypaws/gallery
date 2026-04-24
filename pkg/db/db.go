@@ -25,7 +25,14 @@ func Open(cfg config.Config) (*gorm.DB, error) {
 		return nil, err
 	}
 
-	if err := db.AutoMigrate(&models.Photo{}, &models.PhotoExif{}, &models.PhotoOverride{}, &models.Derivative{}); err != nil {
+	if err := db.AutoMigrate(
+		&models.Photo{},
+		&models.PhotoExif{},
+		&models.PhotoOverride{},
+		&models.Derivative{},
+		&models.PhotoView{},
+		&models.PhotoStar{},
+	); err != nil {
 		return nil, err
 	}
 

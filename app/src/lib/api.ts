@@ -1,4 +1,4 @@
-import type { GalleryResponse, PhotoPatchPayload } from './types'
+import type { GalleryInteraction, GalleryResponse, PhotoPatchPayload } from './types'
 
 async function expectOK(response: Response) {
   if (!response.ok) {
@@ -48,4 +48,20 @@ export async function patchPhoto(id: number, payload: PhotoPatchPayload) {
     body: JSON.stringify(payload),
   })
   await expectOK(response)
+}
+
+export async function trackPhotoView(id: number) {
+  const response = await fetch(`/api/photos/${id}/view`, {
+    method: 'POST',
+  })
+  await expectOK(response)
+  return (await response.json()) as GalleryInteraction
+}
+
+export async function togglePhotoStar(id: number) {
+  const response = await fetch(`/api/photos/${id}/star`, {
+    method: 'POST',
+  })
+  await expectOK(response)
+  return (await response.json()) as GalleryInteraction
 }

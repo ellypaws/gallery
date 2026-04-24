@@ -7,15 +7,22 @@ import { Lightbox } from './components/Lightbox'
 import { MasonryGallery } from './components/MasonryGallery'
 import { BarLoader } from './components/BarLoader.tsx'
 import { useTheme } from './hooks/useTheme'
-import { fetchAdminGallery, fetchGallery } from './lib/api'
-import type { GalleryItem } from './lib/types'
+import { fetchAdminGallery, fetchGallery, togglePhotoStar, trackPhotoView } from './lib/api'
+import type { GalleryInteraction, GalleryItem } from './lib/types'
 
 const MASONRY_STORAGE_KEY = 'gallery-masonry'
 const GROUPED_STORAGE_KEY = 'gallery-grouped'
+const VIEWED_STORAGE_KEY = 'gallery-viewed-photos'
+const STARRED_STORAGE_KEY = 'gallery-starred-photos'
+const VIEW_DEBOUNCE_MS = 450
 
 function App() {
   const { theme, toggleTheme } = useTheme()
   const shellRef = useRef<HTMLDivElement | null>(null)
+  const viewedPhotoIdsRef = useRef<Set<number>>(readStoredNumberSet(VIEWED_STORAGE_KEY))
+  const viewTimersRef = useRef<Map<number, number>>(new Map())
+  const pendingViewsRef = useRef<Set<number>>(new Set())
+  const pendingStarsRef = useRef<Set<number>>(new Set())
   const nextWindowIdRef = useRef(1)
   const nextZIndexRef = useRef(10)
   const [photos, setPhotos] = useState<GalleryItem[]>([])
@@ -96,6 +103,17 @@ function App() {
     return () => ctx.revert()
   }, [isAdmin, photos.length, isFetching])
 
+  useEffect(() => {
+    const timers = viewTimersRef.current
+
+    return () => {
+      for (const timer of timers.values()) {
+        window.clearTimeout(timer)
+      }
+      timers.clear()
+    }
+  }, [])
+
   function animateThemeToggle() {
     gsap.fromTo(
       '.theme-switch',
@@ -121,6 +139,104 @@ function App() {
       { scale: 1, y: 0, duration: 0.2, ease: 'power2.out' },
     )
     setIsMasonry((value) => !value)
+  }
+
+  function schedulePhotoView(photoID: number) {
+    if (viewedPhotoIdsRef.current.has(photoID) || pendingViewsRef.current.has(photoID)) {
+      return
+    }
+
+    const existingTimer = viewTimersRef.current.get(photoID)
+    if (existingTimer) {
+      window.clearTimeout(existingTimer)
+    }
+
+    const timer = window.setTimeout(() => {
+      viewTimersRef.current.delete(photoID)
+      if (viewedPhotoIdsRef.current.has(photoID) || pendingViewsRef.current.has(photoID)) {
+        return
+      }
+
+      pendingViewsRef.current.add(photoID)
+      void trackPhotoView(photoID)
+        .then((interaction) => {
+          viewedPhotoIdsRef.current.add(photoID)
+          writeStoredNumberSet(VIEWED_STORAGE_KEY, viewedPhotoIdsRef.current)
+          applyInteraction(interaction)
+        })
+        .catch(() => {
+          // Ignore interaction failures so viewing the gallery never blocks.
+        })
+        .finally(() => {
+          pendingViewsRef.current.delete(photoID)
+        })
+    }, VIEW_DEBOUNCE_MS)
+
+    viewTimersRef.current.set(photoID, timer)
+  }
+
+  function applyInteraction(interaction: GalleryInteraction) {
+    setPhotos((current) =>
+      current.map((photo) =>
+        photo.id === interaction.photoId
+          ? {
+              ...photo,
+              viewCount: interaction.viewCount,
+              starCount: interaction.starCount,
+              starred: interaction.starred,
+            }
+          : photo,
+      ),
+    )
+  }
+
+  function handleToggleStar(photoID: number) {
+    if (pendingStarsRef.current.has(photoID)) {
+      return
+    }
+
+    pendingStarsRef.current.add(photoID)
+    const currentPhoto = photos.find((photo) => photo.id === photoID)
+    if (currentPhoto) {
+      const starred = !currentPhoto.starred
+      updateStoredNumberSet(STARRED_STORAGE_KEY, photoID, starred)
+      setPhotos((current) =>
+        current.map((photo) =>
+          photo.id === photoID
+            ? {
+                ...photo,
+                starred,
+                starCount: Math.max(0, photo.starCount + (starred ? 1 : -1)),
+              }
+            : photo,
+        ),
+      )
+    }
+
+    void togglePhotoStar(photoID)
+      .then((interaction) => {
+        updateStoredNumberSet(STARRED_STORAGE_KEY, photoID, interaction.starred)
+        applyInteraction(interaction)
+      })
+      .catch(() => {
+        if (currentPhoto) {
+          updateStoredNumberSet(STARRED_STORAGE_KEY, photoID, currentPhoto.starred)
+          setPhotos((current) =>
+            current.map((photo) =>
+              photo.id === photoID
+                ? {
+                    ...photo,
+                    starred: currentPhoto.starred,
+                    starCount: currentPhoto.starCount,
+                  }
+                : photo,
+            ),
+          )
+        }
+      })
+      .finally(() => {
+        pendingStarsRef.current.delete(photoID)
+      })
   }
 
   const groupedPhotos = useMemo<{ label: string; items: { globalIndex: number; photo: GalleryItem }[] }[]>(() => {
@@ -157,6 +273,9 @@ function App() {
 
   function openPhotoWindow(index: number) {
     const photo = photos[index]
+    if (photo) {
+      schedulePhotoView(photo.id)
+    }
     setLightboxWindows((current) => {
       const id = nextWindowIdRef.current++
       const zIndex = ++nextZIndexRef.current
@@ -309,7 +428,11 @@ function App() {
                       </div>
                     ) : null}
 
-                    <MasonryGallery items={group.items} onOpen={openPhotoWindow} isMasonry={isMasonry} />
+                    <MasonryGallery
+                      items={group.items}
+                      onOpen={openPhotoWindow}
+                      isMasonry={isMasonry}
+                    />
                   </section>
                 ))}
               </div>
@@ -342,6 +465,7 @@ function App() {
               onClose={() => closeWindow(windowItem.id)}
               onPrev={() => setWindowPhoto(windowItem.id, (current) => (current - 1 + photos.length) % photos.length)}
               onNext={() => setWindowPhoto(windowItem.id, (current) => (current + 1) % photos.length)}
+              onStar={handleToggleStar}
             />
           ))}
         </div>
@@ -397,8 +521,50 @@ function getStoredViewFlag(key: string, fallback: boolean) {
   return fallback
 }
 
+function readStoredNumberSet(key: string) {
+  if (typeof window === 'undefined') {
+    return new Set<number>()
+  }
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(key) || '[]')
+    if (!Array.isArray(parsed)) {
+      return new Set<number>()
+    }
+    return new Set(parsed.filter((value): value is number => Number.isInteger(value)))
+  } catch {
+    return new Set<number>()
+  }
+}
+
+function writeStoredNumberSet(key: string, values: Set<number>) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.localStorage.setItem(key, JSON.stringify([...values].sort((a, b) => a - b)))
+}
+
+function updateStoredNumberSet(key: string, value: number, enabled: boolean) {
+  const values = readStoredNumberSet(key)
+  if (enabled) {
+    values.add(value)
+  } else {
+    values.delete(value)
+  }
+  writeStoredNumberSet(key, values)
+}
+
+function syncStoredStarIds(photos: GalleryItem[]) {
+  writeStoredNumberSet(
+    STARRED_STORAGE_KEY,
+    new Set(photos.filter((photo) => photo.starred).map((photo) => photo.id)),
+  )
+}
+
 async function loadGalleryPhotos(isAdmin: boolean) {
   const response = isAdmin ? await fetchAdminGallery() : await fetchGallery()
+  syncStoredStarIds(response.photos)
   return response.photos
 }
 

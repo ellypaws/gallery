@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { gsap } from 'gsap'
-import { Aperture, Camera, ChevronLeft, ChevronRight, Clock3, ExternalLink, Search, X } from 'lucide-react'
+import { Aperture, Camera, ChevronLeft, ChevronRight, Clock3, ExternalLink, Eye, Search, Star, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 import type { GalleryItem } from '../lib/types'
@@ -19,6 +19,7 @@ type LightboxProps = {
   onClose: () => void
   onPrev: () => void
   onNext: () => void
+  onStar: (photoID: number) => void
 }
 
 type MetaRow = {
@@ -47,6 +48,7 @@ export function Lightbox({
   onClose,
   onPrev,
   onNext,
+  onStar,
 }: LightboxProps) {
   const overlayRef = useRef<HTMLDivElement | null>(null)
   const frameRef = useRef<HTMLDivElement | null>(null)
@@ -125,9 +127,12 @@ export function Lightbox({
   }, [activeIndex])
 
   const desktopRectRef = useRef(desktopRect)
-  desktopRectRef.current = desktopRect
   const onRectChangeRef = useRef(onRectChange)
-  onRectChangeRef.current = onRectChange
+
+  useLayoutEffect(() => {
+    desktopRectRef.current = desktopRect
+    onRectChangeRef.current = onRectChange
+  }, [desktopRect, onRectChange])
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -325,6 +330,36 @@ export function Lightbox({
             >
               <X className="h-3.5 w-3.5" />
             </button>
+
+            <button
+              type="button"
+              onClick={() => onStar(photo.id)}
+              className={`forum-button absolute right-12 top-2 z-20 !min-h-[28px] !gap-1 !px-[8px] ${photo.starred ? 'star-marker-active' : ''}`}
+              aria-label={photo.starred ? 'Remove star' : 'Add star'}
+              aria-pressed={photo.starred}
+            >
+              <Star className={`h-3.5 w-3.5 ${photo.starred ? 'fill-current' : ''}`} />
+              <span className="forum-button-label">{formatCount(photo.starCount)}</span>
+            </button>
+
+          </div>
+
+          <div className="shrink-0 p-2 pb-0">
+            <div className="bp-panel p-2">
+              <p className="m-0 mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-soft)]">Stats</p>
+              <div className="flex flex-wrap gap-x-5 gap-y-2">
+                <div className="lightbox-detail-row flex items-center gap-1.5 text-[11px] text-[var(--text)]">
+                  <Eye className="h-4 w-4 shrink-0 text-[var(--viewer-ink)]" />
+                  <span className="font-bold text-[var(--text-soft)]">Views</span>
+                  <span className="text-[var(--text-strong)]">{formatCount(photo.viewCount)}</span>
+                </div>
+                <div className="lightbox-detail-row flex items-center gap-1.5 text-[11px] text-[var(--text)]">
+                  <Star className={`h-4 w-4 shrink-0 text-[var(--viewer-ink)] ${photo.starred ? 'fill-current' : ''}`} />
+                  <span className="font-bold text-[var(--text-soft)]">Favorites</span>
+                  <span className="text-[var(--text-strong)]">{formatCount(photo.starCount)}</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {metaRows.length > 0 ? (
@@ -422,6 +457,20 @@ export function Lightbox({
               <ChevronRight className="h-4 w-4" />
             </button>
 
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                onStar(photo.id)
+              }}
+              className={`forum-button ${photo.starred ? 'star-marker-active' : ''}`}
+              aria-label={photo.starred ? 'Remove star' : 'Add star'}
+              aria-pressed={photo.starred}
+            >
+              <Star className={`h-4 w-4 ${photo.starred ? 'fill-current' : ''}`} />
+              <span className="forum-button-label">{formatCount(photo.starCount)}</span>
+            </button>
+
             {photo.originalSrc ? (
               <a
                 href={photo.originalSrc}
@@ -482,6 +531,20 @@ export function Lightbox({
                       <dd className="forum-meta-desc">{row.value}</dd>
                     </div>
                   ))}
+                </dl>
+              </div>
+
+              <div className="forum-meta-box mt-2">
+                <p className="m-0 mb-2 text-[11px] font-bold text-[var(--viewer-ink)]">Stats</p>
+                <dl className="forum-meta-table text-[11px]">
+                  <div className="lightbox-detail-row contents">
+                    <dt className="forum-meta-term">Views</dt>
+                    <dd className="forum-meta-desc">{formatCount(photo.viewCount)}</dd>
+                  </div>
+                  <div className="lightbox-detail-row contents">
+                    <dt className="forum-meta-term">Favorites</dt>
+                    <dd className="forum-meta-desc">{formatCount(photo.starCount)}</dd>
+                  </div>
                 </dl>
               </div>
 
@@ -620,6 +683,10 @@ function formatMetaValue(row: MetaRow) {
     return `f/${row.value}`
   }
   return row.value
+}
+
+function formatCount(value: number) {
+  return new Intl.NumberFormat(undefined, { notation: value >= 10000 ? 'compact' : 'standard' }).format(value)
 }
 
 const RESIZE_HANDLES: { direction: ResizeDirection; className: string }[] = [

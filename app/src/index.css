@@ -425,6 +425,11 @@ code {
     opacity: 0.65;
   }
 
+  .star-marker-active {
+    background: linear-gradient(180deg, #fff4a8 0%, #d5b642 100%);
+    color: #000000;
+  }
+
   .forum-button-label {
     font-size: 11px;
     font-weight: 700;

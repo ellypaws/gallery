@@ -16,6 +16,8 @@ type Photo struct {
 	Exif         PhotoExif     `gorm:"constraint:OnDelete:CASCADE;"`
 	Override     PhotoOverride `gorm:"constraint:OnDelete:CASCADE;"`
 	Derivatives  []Derivative  `gorm:"constraint:OnDelete:CASCADE;"`
+	Views        []PhotoView   `gorm:"constraint:OnDelete:CASCADE;"`
+	Stars        []PhotoStar   `gorm:"constraint:OnDelete:CASCADE;"`
 }
 
 type PhotoExif struct {
@@ -50,4 +52,18 @@ type Derivative struct {
 	Height       int
 	ByteSize     int64
 	MimeType     string
+}
+
+type PhotoView struct {
+	ID         uint `gorm:"primaryKey"`
+	CreatedAt  time.Time
+	PhotoID    uint   `gorm:"uniqueIndex:idx_photo_viewer;index;not null"`
+	ViewerHash string `gorm:"uniqueIndex:idx_photo_viewer;size:64;not null"`
+}
+
+type PhotoStar struct {
+	ID         uint `gorm:"primaryKey"`
+	CreatedAt  time.Time
+	PhotoID    uint   `gorm:"uniqueIndex:idx_photo_starrer;index;not null"`
+	ViewerHash string `gorm:"uniqueIndex:idx_photo_starrer;size:64;not null"`
 }

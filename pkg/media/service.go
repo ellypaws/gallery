@@ -20,6 +20,7 @@ import (
 
 	"github.com/charmbracelet/log"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type Service struct {
@@ -61,6 +62,22 @@ type GalleryItem struct {
 	SortOrder       int        `json:"sortOrder"`
 	Hidden          bool       `json:"hidden"`
 	RelativePath    string     `json:"relativePath"`
+	ViewCount       int64      `json:"viewCount"`
+	StarCount       int64      `json:"starCount"`
+	Starred         bool       `json:"starred"`
+}
+
+type GalleryInteraction struct {
+	PhotoID   uint  `json:"photoId"`
+	ViewCount int64 `json:"viewCount"`
+	StarCount int64 `json:"starCount"`
+	Starred   bool  `json:"starred"`
+}
+
+type interactionStats struct {
+	viewCounts  map[uint]int64
+	starCounts  map[uint]int64
+	viewerStars map[uint]bool
 }
 
 type PhotoOverrideInput struct {
@@ -301,15 +318,15 @@ func (s *Service) syncFile(absPath string) (uint, error) {
 	return photo.ID, nil
 }
 
-func (s *Service) Gallery(ctx context.Context) (GalleryResponse, error) {
-	return s.gallery(ctx, false)
+func (s *Service) Gallery(ctx context.Context, viewerHash string) (GalleryResponse, error) {
+	return s.gallery(ctx, false, viewerHash)
 }
 
-func (s *Service) AdminGallery(ctx context.Context) (GalleryResponse, error) {
-	return s.gallery(ctx, true)
+func (s *Service) AdminGallery(ctx context.Context, viewerHash string) (GalleryResponse, error) {
+	return s.gallery(ctx, true, viewerHash)
 }
 
-func (s *Service) gallery(ctx context.Context, includeHidden bool) (GalleryResponse, error) {
+func (s *Service) gallery(ctx context.Context, includeHidden bool, viewerHash string) (GalleryResponse, error) {
 	var photos []models.Photo
 
 	s.dbMu.RLock()
@@ -326,12 +343,25 @@ func (s *Service) gallery(ctx context.Context, includeHidden bool) (GalleryRespo
 	}
 
 	items := make([]GalleryItem, 0, len(photos))
+	photoIDs := make([]uint, 0, len(photos))
 	for _, photo := range photos {
 		item := s.toGalleryItem(photo)
 		if item.Hidden && !includeHidden {
 			continue
 		}
 		items = append(items, item)
+		photoIDs = append(photoIDs, item.ID)
+	}
+
+	stats, err := s.interactionStats(ctx, photoIDs, viewerHash)
+	if err != nil {
+		return GalleryResponse{}, err
+	}
+	for index := range items {
+		photoID := items[index].ID
+		items[index].ViewCount = stats.viewCounts[photoID]
+		items[index].StarCount = stats.starCounts[photoID]
+		items[index].Starred = stats.viewerStars[photoID]
 	}
 
 	sort.SliceStable(items, func(i, j int) bool {
@@ -359,6 +389,134 @@ func (s *Service) gallery(ctx context.Context, includeHidden bool) (GalleryRespo
 		Title:  s.cfg.SiteTitle,
 		Photos: items,
 	}, nil
+}
+
+func (s *Service) TrackView(ctx context.Context, photoID uint, viewerHash string) (GalleryInteraction, error) {
+	if viewerHash == "" {
+		return GalleryInteraction{}, errors.New("missing viewer")
+	}
+
+	s.dbMu.Lock()
+	err := s.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&models.PhotoView{
+		PhotoID:    photoID,
+		ViewerHash: viewerHash,
+	}).Error
+	s.dbMu.Unlock()
+	if err != nil {
+		return GalleryInteraction{}, err
+	}
+
+	return s.photoInteraction(ctx, photoID, viewerHash)
+}
+
+func (s *Service) ToggleStar(ctx context.Context, photoID uint, viewerHash string) (GalleryInteraction, error) {
+	if viewerHash == "" {
+		return GalleryInteraction{}, errors.New("missing viewer")
+	}
+
+	starred := false
+	s.dbMu.Lock()
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var star models.PhotoStar
+		err := tx.Where("photo_id = ? AND viewer_hash = ?", photoID, viewerHash).First(&star).Error
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			if err := tx.Create(&models.PhotoStar{PhotoID: photoID, ViewerHash: viewerHash}).Error; err != nil {
+				return err
+			}
+			starred = true
+			return nil
+		case err != nil:
+			return err
+		default:
+			if err := tx.Delete(&star).Error; err != nil {
+				return err
+			}
+			starred = false
+			return nil
+		}
+	})
+	s.dbMu.Unlock()
+	if err != nil {
+		return GalleryInteraction{}, err
+	}
+
+	interaction, err := s.photoInteraction(ctx, photoID, viewerHash)
+	if err != nil {
+		return GalleryInteraction{}, err
+	}
+	interaction.Starred = starred
+	return interaction, nil
+}
+
+func (s *Service) photoInteraction(ctx context.Context, photoID uint, viewerHash string) (GalleryInteraction, error) {
+	stats, err := s.interactionStats(ctx, []uint{photoID}, viewerHash)
+	if err != nil {
+		return GalleryInteraction{}, err
+	}
+
+	return GalleryInteraction{
+		PhotoID:   photoID,
+		ViewCount: stats.viewCounts[photoID],
+		StarCount: stats.starCounts[photoID],
+		Starred:   stats.viewerStars[photoID],
+	}, nil
+}
+
+func (s *Service) interactionStats(ctx context.Context, photoIDs []uint, viewerHash string) (interactionStats, error) {
+	stats := interactionStats{
+		viewCounts:  map[uint]int64{},
+		starCounts:  map[uint]int64{},
+		viewerStars: map[uint]bool{},
+	}
+	if len(photoIDs) == 0 {
+		return stats, nil
+	}
+
+	type countRow struct {
+		PhotoID uint
+		Count   int64
+	}
+	var viewRows []countRow
+	var starRows []countRow
+	var viewerStars []models.PhotoStar
+
+	s.dbMu.RLock()
+	err := s.db.WithContext(ctx).
+		Model(&models.PhotoView{}).
+		Select("photo_id, count(*) as count").
+		Where("photo_id IN ?", photoIDs).
+		Group("photo_id").
+		Scan(&viewRows).Error
+	if err == nil {
+		err = s.db.WithContext(ctx).
+			Model(&models.PhotoStar{}).
+			Select("photo_id, count(*) as count").
+			Where("photo_id IN ?", photoIDs).
+			Group("photo_id").
+			Scan(&starRows).Error
+	}
+	if err == nil && viewerHash != "" {
+		err = s.db.WithContext(ctx).
+			Where("photo_id IN ? AND viewer_hash = ?", photoIDs, viewerHash).
+			Find(&viewerStars).Error
+	}
+	s.dbMu.RUnlock()
+	if err != nil {
+		return interactionStats{}, err
+	}
+
+	for _, row := range viewRows {
+		stats.viewCounts[row.PhotoID] = row.Count
+	}
+	for _, row := range starRows {
+		stats.starCounts[row.PhotoID] = row.Count
+	}
+	for _, row := range viewerStars {
+		stats.viewerStars[row.PhotoID] = true
+	}
+
+	return stats, nil
 }
 
 func (s *Service) UploadFiles(ctx context.Context, filenames []string) error {

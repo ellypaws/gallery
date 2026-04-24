@@ -56,6 +56,8 @@ func New(cfg config.Config, logger *log.Logger, mediaService *media.Service) *Ap
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
 	e.GET("/api/gallery", handler.GetGallery)
+	e.POST("/api/photos/:id/view", handler.TrackView)
+	e.POST("/api/photos/:id/star", handler.ToggleStar)
 
 	adminAuth := auth.BasicAuth(cfg)
 	adminAPI := e.Group("/api/admin", adminAuth)

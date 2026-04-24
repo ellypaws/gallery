@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual'
+import { Star } from 'lucide-react'
 
 import type { GalleryItem } from '../lib/types'
 
@@ -254,8 +255,14 @@ function GalleryCard({
         </div>
 
         <div className="flex flex-col justify-between px-1 pb-1 pt-2">
-          <p className="m-0 mb-1 truncate text-[11px] font-bold text-[var(--text-strong)]" title={title}>{title}</p>
-          <div className="flex items-center justify-between text-[10px] text-[var(--text-soft)]">
+          <div className="mb-1 flex min-w-0 items-center justify-between gap-2">
+            <p className="m-0 min-w-0 truncate text-[11px] font-bold text-[var(--text-strong)]" title={title}>{title}</p>
+            <span className={`inline-flex shrink-0 items-center gap-1 text-[10px] font-bold ${entry.photo.starred ? 'text-[var(--text-strong)]' : 'text-[var(--text-soft)]'}`}>
+              <Star className={`h-3 w-3 ${entry.photo.starred ? 'fill-current' : ''}`} />
+              <span>{formatCount(entry.photo.starCount)}</span>
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-2 text-[10px] text-[var(--text-soft)]">
             <span>{stamp}</span>
             <span>{entry.photo.width}×{entry.photo.height}</span>
           </div>
@@ -263,6 +270,10 @@ function GalleryCard({
       </div>
     </div>
   )
+}
+
+function formatCount(value: number) {
+  return new Intl.NumberFormat(undefined, { notation: value >= 10000 ? 'compact' : 'standard' }).format(value)
 }
 
 function getCoverSlotWidth(containerWidth: number, containerHeight: number, imageWidth: number, imageHeight: number) {

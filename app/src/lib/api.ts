@@ -58,6 +58,14 @@ export async function trackPhotoView(id: number) {
   return (await response.json()) as GalleryInteraction
 }
 
+export async function trackPhotoClick(id: number) {
+  const response = await fetch(`/api/photos/${id}/click`, {
+    method: 'POST',
+  })
+  await expectOK(response)
+  return (await response.json()) as GalleryInteraction
+}
+
 export async function togglePhotoStar(id: number) {
   const response = await fetch(`/api/photos/${id}/star`, {
     method: 'POST',

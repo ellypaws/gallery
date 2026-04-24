@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual'
 import { Star } from 'lucide-react'
 
@@ -10,6 +10,7 @@ type MasonryGalleryProps = {
   photos?: GalleryItem[]
   items?: { photo: GalleryItem; globalIndex: number }[]
   onOpen: (index: number) => void
+  onView: (photoID: number) => void
   isMasonry?: boolean
 }
 
@@ -27,7 +28,7 @@ type MasonryColumn = {
   height: number
 }
 
-export function MasonryGallery({ photos, items, onOpen, isMasonry }: MasonryGalleryProps) {
+export function MasonryGallery({ photos, items, onOpen, onView, isMasonry }: MasonryGalleryProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [width, setWidth] = useState(0)
   const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null)
@@ -119,6 +120,7 @@ export function MasonryGallery({ photos, items, onOpen, isMasonry }: MasonryGall
             columnWidth={columns.columnWidth}
             scrollElement={scrollElement}
             onOpen={onOpen}
+            onView={onView}
           />
         ))}
       </div>
@@ -132,12 +134,14 @@ function VirtualColumn({
   columnWidth,
   scrollElement,
   onOpen,
+  onView,
 }: {
   column: MasonryColumn
   gap: number
   columnWidth: number
   scrollElement: HTMLElement | null
   onOpen: (index: number) => void
+  onView: (photoID: number) => void
 }) {
   const [parentElement, setParentElement] = useState<HTMLDivElement | null>(null)
   const [scrollMargin, setScrollMargin] = useState(0)
@@ -192,6 +196,8 @@ function VirtualColumn({
               columnWidth={columnWidth}
               scrollMargin={virtualizer.options.scrollMargin}
               onOpen={onOpen}
+              onView={onView}
+              scrollElement={scrollElement}
               measureElement={virtualizer.measureElement}
             />
           )
@@ -208,6 +214,8 @@ function GalleryCard({
   columnWidth,
   scrollMargin,
   onOpen,
+  onView,
+  scrollElement,
   measureElement,
 }: {
   virtualItem: VirtualItem
@@ -216,15 +224,47 @@ function GalleryCard({
   columnWidth: number
   scrollMargin: number
   onOpen: (index: number) => void
+  onView: (photoID: number) => void
+  scrollElement: HTMLElement | null
   measureElement: (node: Element | null) => void
 }) {
+  const [cardElement, setCardElement] = useState<HTMLDivElement | null>(null)
   const coverSlotWidth = getCoverSlotWidth(columnWidth, entry.imageHeight, entry.photo.width, entry.photo.height)
   const title = getPhotoLabel(entry.photo)
   const stamp = formatShortDate(entry.photo.capturedAt || entry.photo.updatedAt) || 'Undated'
+  const setMeasuredElement = useCallback(
+    (node: HTMLDivElement | null) => {
+      measureElement(node)
+      setCardElement(node)
+    },
+    [measureElement],
+  )
+
+  useEffect(() => {
+    if (!cardElement) {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((observerEntry) => observerEntry.isIntersecting && observerEntry.intersectionRatio >= 0.35)) {
+          onView(entry.photo.id)
+          observer.disconnect()
+        }
+      },
+      {
+        root: scrollElement,
+        threshold: [0.35],
+      },
+    )
+
+    observer.observe(cardElement)
+    return () => observer.disconnect()
+  }, [cardElement, entry.photo.id, onView, scrollElement])
 
   return (
     <div
-      ref={measureElement}
+      ref={setMeasuredElement}
       data-index={virtualItem.index}
       className="absolute left-0 w-full"
       style={{

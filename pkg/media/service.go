@@ -63,19 +63,22 @@ type GalleryItem struct {
 	Hidden          bool       `json:"hidden"`
 	RelativePath    string     `json:"relativePath"`
 	ViewCount       int64      `json:"viewCount"`
+	ClickCount      int64      `json:"clickCount"`
 	StarCount       int64      `json:"starCount"`
 	Starred         bool       `json:"starred"`
 }
 
 type GalleryInteraction struct {
-	PhotoID   uint  `json:"photoId"`
-	ViewCount int64 `json:"viewCount"`
-	StarCount int64 `json:"starCount"`
-	Starred   bool  `json:"starred"`
+	PhotoID    uint  `json:"photoId"`
+	ViewCount  int64 `json:"viewCount"`
+	ClickCount int64 `json:"clickCount"`
+	StarCount  int64 `json:"starCount"`
+	Starred    bool  `json:"starred"`
 }
 
 type interactionStats struct {
 	viewCounts  map[uint]int64
+	clickCounts map[uint]int64
 	starCounts  map[uint]int64
 	viewerStars map[uint]bool
 }
@@ -360,6 +363,7 @@ func (s *Service) gallery(ctx context.Context, includeHidden bool, viewerHash st
 	for index := range items {
 		photoID := items[index].ID
 		items[index].ViewCount = stats.viewCounts[photoID]
+		items[index].ClickCount = stats.clickCounts[photoID]
 		items[index].StarCount = stats.starCounts[photoID]
 		items[index].Starred = stats.viewerStars[photoID]
 	}
@@ -401,6 +405,32 @@ func (s *Service) TrackView(ctx context.Context, photoID uint, viewerHash string
 		PhotoID:    photoID,
 		ViewerHash: viewerHash,
 	}).Error
+	s.dbMu.Unlock()
+	if err != nil {
+		return GalleryInteraction{}, err
+	}
+
+	return s.photoInteraction(ctx, photoID, viewerHash)
+}
+
+func (s *Service) TrackClick(ctx context.Context, photoID uint, viewerHash string) (GalleryInteraction, error) {
+	if viewerHash == "" {
+		return GalleryInteraction{}, errors.New("missing viewer")
+	}
+
+	s.dbMu.Lock()
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&models.PhotoView{
+			PhotoID:    photoID,
+			ViewerHash: viewerHash,
+		}).Error; err != nil {
+			return err
+		}
+		return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&models.PhotoClick{
+			PhotoID:    photoID,
+			ViewerHash: viewerHash,
+		}).Error
+	})
 	s.dbMu.Unlock()
 	if err != nil {
 		return GalleryInteraction{}, err
@@ -456,16 +486,18 @@ func (s *Service) photoInteraction(ctx context.Context, photoID uint, viewerHash
 	}
 
 	return GalleryInteraction{
-		PhotoID:   photoID,
-		ViewCount: stats.viewCounts[photoID],
-		StarCount: stats.starCounts[photoID],
-		Starred:   stats.viewerStars[photoID],
+		PhotoID:    photoID,
+		ViewCount:  stats.viewCounts[photoID],
+		ClickCount: stats.clickCounts[photoID],
+		StarCount:  stats.starCounts[photoID],
+		Starred:    stats.viewerStars[photoID],
 	}, nil
 }
 
 func (s *Service) interactionStats(ctx context.Context, photoIDs []uint, viewerHash string) (interactionStats, error) {
 	stats := interactionStats{
 		viewCounts:  map[uint]int64{},
+		clickCounts: map[uint]int64{},
 		starCounts:  map[uint]int64{},
 		viewerStars: map[uint]bool{},
 	}
@@ -478,6 +510,7 @@ func (s *Service) interactionStats(ctx context.Context, photoIDs []uint, viewerH
 		Count   int64
 	}
 	var viewRows []countRow
+	var clickRows []countRow
 	var starRows []countRow
 	var viewerStars []models.PhotoStar
 
@@ -488,6 +521,14 @@ func (s *Service) interactionStats(ctx context.Context, photoIDs []uint, viewerH
 		Where("photo_id IN ?", photoIDs).
 		Group("photo_id").
 		Scan(&viewRows).Error
+	if err == nil {
+		err = s.db.WithContext(ctx).
+			Model(&models.PhotoClick{}).
+			Select("photo_id, count(*) as count").
+			Where("photo_id IN ?", photoIDs).
+			Group("photo_id").
+			Scan(&clickRows).Error
+	}
 	if err == nil {
 		err = s.db.WithContext(ctx).
 			Model(&models.PhotoStar{}).
@@ -508,6 +549,9 @@ func (s *Service) interactionStats(ctx context.Context, photoIDs []uint, viewerH
 
 	for _, row := range viewRows {
 		stats.viewCounts[row.PhotoID] = row.Count
+	}
+	for _, row := range clickRows {
+		stats.clickCounts[row.PhotoID] = row.Count
 	}
 	for _, row := range starRows {
 		stats.starCounts[row.PhotoID] = row.Count

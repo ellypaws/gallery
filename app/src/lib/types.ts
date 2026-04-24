@@ -25,6 +25,7 @@ export type GalleryItem = {
   hidden: boolean
   relativePath: string
   viewCount: number
+  clickCount: number
   starCount: number
   starred: boolean
 }
@@ -49,6 +50,7 @@ export type PhotoPatchPayload = {
 export type GalleryInteraction = {
   photoId: number
   viewCount: number
+  clickCount: number
   starCount: number
   starred: boolean
 }

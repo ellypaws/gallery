@@ -17,6 +17,7 @@ type Photo struct {
 	Override     PhotoOverride `gorm:"constraint:OnDelete:CASCADE;"`
 	Derivatives  []Derivative  `gorm:"constraint:OnDelete:CASCADE;"`
 	Views        []PhotoView   `gorm:"constraint:OnDelete:CASCADE;"`
+	Clicks       []PhotoClick  `gorm:"constraint:OnDelete:CASCADE;"`
 	Stars        []PhotoStar   `gorm:"constraint:OnDelete:CASCADE;"`
 }
 
@@ -59,6 +60,13 @@ type PhotoView struct {
 	CreatedAt  time.Time
 	PhotoID    uint   `gorm:"uniqueIndex:idx_photo_viewer;index;not null"`
 	ViewerHash string `gorm:"uniqueIndex:idx_photo_viewer;size:64;not null"`
+}
+
+type PhotoClick struct {
+	ID         uint `gorm:"primaryKey"`
+	CreatedAt  time.Time
+	PhotoID    uint   `gorm:"uniqueIndex:idx_photo_clicker;index;not null"`
+	ViewerHash string `gorm:"uniqueIndex:idx_photo_clicker;size:64;not null"`
 }
 
 type PhotoStar struct {

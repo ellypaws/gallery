@@ -128,6 +128,20 @@ func (h *Handler) TrackView(c echo.Context) error {
 	return c.JSON(http.StatusOK, interaction)
 }
 
+func (h *Handler) TrackClick(c echo.Context) error {
+	photoID, err := parsePhotoID(c)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid photo id")
+	}
+
+	interaction, err := h.service.TrackClick(c.Request().Context(), photoID, viewerHash(c))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	return c.JSON(http.StatusOK, interaction)
+}
+
 func (h *Handler) ToggleStar(c echo.Context) error {
 	photoID, err := parsePhotoID(c)
 	if err != nil {

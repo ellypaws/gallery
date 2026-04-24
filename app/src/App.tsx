@@ -7,12 +7,13 @@ import { Lightbox } from './components/Lightbox'
 import { MasonryGallery } from './components/MasonryGallery'
 import { BarLoader } from './components/BarLoader.tsx'
 import { useTheme } from './hooks/useTheme'
-import { fetchAdminGallery, fetchGallery, togglePhotoStar, trackPhotoView } from './lib/api'
+import { fetchAdminGallery, fetchGallery, togglePhotoStar, trackPhotoClick, trackPhotoView } from './lib/api'
 import type { GalleryInteraction, GalleryItem } from './lib/types'
 
 const MASONRY_STORAGE_KEY = 'gallery-masonry'
 const GROUPED_STORAGE_KEY = 'gallery-grouped'
 const VIEWED_STORAGE_KEY = 'gallery-viewed-photos'
+const CLICKED_STORAGE_KEY = 'gallery-clicked-photos'
 const STARRED_STORAGE_KEY = 'gallery-starred-photos'
 const VIEW_DEBOUNCE_MS = 450
 
@@ -20,8 +21,10 @@ function App() {
   const { theme, toggleTheme } = useTheme()
   const shellRef = useRef<HTMLDivElement | null>(null)
   const viewedPhotoIdsRef = useRef<Set<number>>(readStoredNumberSet(VIEWED_STORAGE_KEY))
+  const clickedPhotoIdsRef = useRef<Set<number>>(readStoredNumberSet(CLICKED_STORAGE_KEY))
   const viewTimersRef = useRef<Map<number, number>>(new Map())
   const pendingViewsRef = useRef<Set<number>>(new Set())
+  const pendingClicksRef = useRef<Set<number>>(new Set())
   const pendingStarsRef = useRef<Set<number>>(new Set())
   const nextWindowIdRef = useRef(1)
   const nextZIndexRef = useRef(10)
@@ -175,19 +178,62 @@ function App() {
     viewTimersRef.current.set(photoID, timer)
   }
 
-  function applyInteraction(interaction: GalleryInteraction) {
+  function applyInteraction(interaction: GalleryInteraction, exactCounts = false) {
     setPhotos((current) =>
       current.map((photo) =>
         photo.id === interaction.photoId
           ? {
               ...photo,
-              viewCount: interaction.viewCount,
-              starCount: interaction.starCount,
+              viewCount: exactCounts ? interaction.viewCount : Math.max(photo.viewCount, interaction.viewCount),
+              clickCount: exactCounts ? interaction.clickCount : Math.max(photo.clickCount, interaction.clickCount),
+              starCount: exactCounts ? interaction.starCount : Math.max(photo.starCount, interaction.starCount),
               starred: interaction.starred,
             }
           : photo,
       ),
     )
+  }
+
+  function clearScheduledPhotoView(photoID: number) {
+    const existingTimer = viewTimersRef.current.get(photoID)
+    if (!existingTimer) {
+      return
+    }
+
+    window.clearTimeout(existingTimer)
+    viewTimersRef.current.delete(photoID)
+  }
+
+  function handlePhotoClick(photoID: number) {
+    clearScheduledPhotoView(photoID)
+
+    if (clickedPhotoIdsRef.current.has(photoID)) {
+      if (!viewedPhotoIdsRef.current.has(photoID)) {
+        schedulePhotoView(photoID)
+      }
+      return
+    }
+    if (pendingClicksRef.current.has(photoID)) {
+      return
+    }
+
+    pendingClicksRef.current.add(photoID)
+    void trackPhotoClick(photoID)
+      .then((interaction) => {
+        viewedPhotoIdsRef.current.add(photoID)
+        clickedPhotoIdsRef.current.add(photoID)
+        writeStoredNumberSet(VIEWED_STORAGE_KEY, viewedPhotoIdsRef.current)
+        writeStoredNumberSet(CLICKED_STORAGE_KEY, clickedPhotoIdsRef.current)
+        applyInteraction(interaction)
+      })
+      .catch(() => {
+        if (!viewedPhotoIdsRef.current.has(photoID)) {
+          schedulePhotoView(photoID)
+        }
+      })
+      .finally(() => {
+        pendingClicksRef.current.delete(photoID)
+      })
   }
 
   function handleToggleStar(photoID: number) {
@@ -216,7 +262,7 @@ function App() {
     void togglePhotoStar(photoID)
       .then((interaction) => {
         updateStoredNumberSet(STARRED_STORAGE_KEY, photoID, interaction.starred)
-        applyInteraction(interaction)
+        applyInteraction(interaction, true)
       })
       .catch(() => {
         if (currentPhoto) {
@@ -274,7 +320,7 @@ function App() {
   function openPhotoWindow(index: number) {
     const photo = photos[index]
     if (photo) {
-      schedulePhotoView(photo.id)
+      handlePhotoClick(photo.id)
     }
     setLightboxWindows((current) => {
       const id = nextWindowIdRef.current++
@@ -431,6 +477,7 @@ function App() {
                     <MasonryGallery
                       items={group.items}
                       onOpen={openPhotoWindow}
+                      onView={schedulePhotoView}
                       isMasonry={isMasonry}
                     />
                   </section>

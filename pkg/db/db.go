@@ -31,6 +31,7 @@ func Open(cfg config.Config) (*gorm.DB, error) {
 		&models.PhotoOverride{},
 		&models.Derivative{},
 		&models.PhotoView{},
+		&models.PhotoClick{},
 		&models.PhotoStar{},
 	); err != nil {
 		return nil, err

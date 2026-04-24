@@ -367,7 +367,7 @@ export function Lightbox({
               <dl className="forum-meta-table text-[11px]">
                 <div className="lightbox-detail-row contents">
                   <dt className="forum-meta-term">Views</dt>
-                  <dd className="forum-meta-desc">{formatCount(photo.viewCount)}</dd>
+                  <dd className="forum-meta-desc">{formatCount(photo.viewCount)} ({formatCount(photo.clickCount)})</dd>
                 </div>
                 <div className="lightbox-detail-row contents">
                   <dt className="forum-meta-term">Favorites</dt>
@@ -554,7 +554,7 @@ export function Lightbox({
                 <dl className="forum-meta-table text-[11px]">
                   <div className="lightbox-detail-row contents">
                     <dt className="forum-meta-term">Views</dt>
-                    <dd className="forum-meta-desc">{formatCount(photo.viewCount)}</dd>
+                    <dd className="forum-meta-desc">{formatCount(photo.viewCount)} ({formatCount(photo.clickCount)})</dd>
                   </div>
                   <div className="lightbox-detail-row contents">
                     <dt className="forum-meta-term">Favorites</dt>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { gsap } from 'gsap'
-import { Calendar, Grid, LayoutDashboard, MoonStar, SunMedium } from 'lucide-react'
+import { Calendar, Grid, LayoutDashboard, MoonStar, Sparkles, SunMedium } from 'lucide-react'
 
 import { AdminPanel } from './components/AdminPanel'
 import { Lightbox } from './components/Lightbox'
@@ -12,6 +12,7 @@ import type { GalleryInteraction, GalleryItem } from './lib/types'
 
 const MASONRY_STORAGE_KEY = 'gallery-masonry'
 const GROUPED_STORAGE_KEY = 'gallery-grouped'
+const HOVER_TILT_STORAGE_KEY = 'gallery-hover-tilt'
 const VIEWED_STORAGE_KEY = 'gallery-viewed-photos'
 const CLICKED_STORAGE_KEY = 'gallery-clicked-photos'
 const STARRED_STORAGE_KEY = 'gallery-starred-photos'
@@ -33,6 +34,7 @@ function App() {
   const [isFetching, setIsFetching] = useState(true)
   const [isMasonry, setIsMasonry] = useState(() => getStoredViewFlag(MASONRY_STORAGE_KEY, true))
   const [isGrouped, setIsGrouped] = useState(() => getStoredViewFlag(GROUPED_STORAGE_KEY, false))
+  const [isHoverTilt, setIsHoverTilt] = useState(() => getStoredViewFlag(HOVER_TILT_STORAGE_KEY, false))
   const [lightboxWindows, setLightboxWindows] = useState<LightboxWindowState[]>([])
   const [lastCustomDesktopRect, setLastCustomDesktopRect] = useState<DesktopLightboxRect | null>(null)
 
@@ -92,6 +94,13 @@ function App() {
   }, [isGrouped])
 
   useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+    window.localStorage.setItem(HOVER_TILT_STORAGE_KEY, String(isHoverTilt))
+  }, [isHoverTilt])
+
+  useEffect(() => {
     if (!shellRef.current || isAdmin) {
       return
     }
@@ -141,6 +150,15 @@ function App() {
       { scale: 1, y: 0, duration: 0.2, ease: 'power2.out' },
     )
     setIsMasonry((value) => !value)
+  }
+
+  function animateHoverTiltToggle() {
+    gsap.fromTo(
+      '.tilt-switch',
+      { scale: 0.96, y: 1 },
+      { scale: 1, y: 0, duration: 0.2, ease: 'power2.out' },
+    )
+    setIsHoverTilt((value) => !value)
   }
 
   function schedulePhotoView(photoID: number) {
@@ -445,6 +463,15 @@ function App() {
               >
                 {theme === 'dark' ? <SunMedium className="h-3.5 w-3.5" /> : <MoonStar className="h-3.5 w-3.5" />}
               </button>
+              <button
+                type="button"
+                onClick={animateHoverTiltToggle}
+                className="forum-icon-button tilt-switch"
+                aria-label={isHoverTilt ? 'Disable hover tilt' : 'Enable hover tilt'}
+                aria-pressed={isHoverTilt}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+              </button>
             </div>
           </div>
 
@@ -490,6 +517,7 @@ function App() {
                       items={group.items}
                       onOpen={openPhotoWindow}
                       onView={schedulePhotoView}
+                      enableHoverTilt={isHoverTilt}
                       isMasonry={isMasonry}
                     />
                   </section>

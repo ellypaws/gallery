@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, type PointerEvent, useCallback, useEffect, useLayoutEffect, useRef, useMemo, useState } from 'react'
 import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual'
 import { Star } from 'lucide-react'
 
@@ -11,6 +11,7 @@ type MasonryGalleryProps = {
   items?: { photo: GalleryItem; globalIndex: number }[]
   onOpen: (index: number) => void
   onView: (photoID: number) => void
+  enableHoverTilt: boolean
   isMasonry?: boolean
 }
 
@@ -28,7 +29,7 @@ type MasonryColumn = {
   height: number
 }
 
-export function MasonryGallery({ photos, items, onOpen, onView, isMasonry }: MasonryGalleryProps) {
+export function MasonryGallery({ photos, items, onOpen, onView, enableHoverTilt, isMasonry }: MasonryGalleryProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [width, setWidth] = useState(0)
   const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null)
@@ -121,6 +122,7 @@ export function MasonryGallery({ photos, items, onOpen, onView, isMasonry }: Mas
             scrollElement={scrollElement}
             onOpen={onOpen}
             onView={onView}
+            enableHoverTilt={enableHoverTilt}
           />
         ))}
       </div>
@@ -135,6 +137,7 @@ function VirtualColumn({
   scrollElement,
   onOpen,
   onView,
+  enableHoverTilt,
 }: {
   column: MasonryColumn
   gap: number
@@ -142,6 +145,7 @@ function VirtualColumn({
   scrollElement: HTMLElement | null
   onOpen: (index: number) => void
   onView: (photoID: number) => void
+  enableHoverTilt: boolean
 }) {
   const [parentElement, setParentElement] = useState<HTMLDivElement | null>(null)
   const [scrollMargin, setScrollMargin] = useState(0)
@@ -197,6 +201,7 @@ function VirtualColumn({
               scrollMargin={virtualizer.options.scrollMargin}
               onOpen={onOpen}
               onView={onView}
+              enableHoverTilt={enableHoverTilt}
               scrollElement={scrollElement}
               measureElement={virtualizer.measureElement}
             />
@@ -215,6 +220,7 @@ function GalleryCard({
   scrollMargin,
   onOpen,
   onView,
+  enableHoverTilt,
   scrollElement,
   measureElement,
 }: {
@@ -225,10 +231,12 @@ function GalleryCard({
   scrollMargin: number
   onOpen: (index: number) => void
   onView: (photoID: number) => void
+  enableHoverTilt: boolean
   scrollElement: HTMLElement | null
   measureElement: (node: Element | null) => void
 }) {
   const [cardElement, setCardElement] = useState<HTMLDivElement | null>(null)
+  const tiltCardRef = useRef<HTMLDivElement | null>(null)
   const coverSlotWidth = getCoverSlotWidth(columnWidth, entry.imageHeight, entry.photo.width, entry.photo.height)
   const title = getPhotoLabel(entry.photo)
   const stamp = formatShortDate(entry.photo.capturedAt || entry.photo.updatedAt) || 'Undated'
@@ -262,6 +270,34 @@ function GalleryCard({
     return () => observer.disconnect()
   }, [cardElement, entry.photo.id, onView, scrollElement])
 
+  function handleTiltPointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (!enableHoverTilt || !canUseHoverTilt()) {
+      return
+    }
+
+    const element = tiltCardRef.current
+    if (!element) {
+      return
+    }
+
+    const rect = element.getBoundingClientRect()
+    const x = clamp((event.clientX - rect.left) / rect.width, 0, 1)
+    const y = clamp((event.clientY - rect.top) / rect.height, 0, 1)
+    const rotateX = (0.5 - y) * 9
+    const rotateY = (x - 0.5) * 11
+
+    element.style.setProperty('--tilt-transform', `perspective(900px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) scale(1.018)`)
+  }
+
+  function handleTiltPointerLeave() {
+    const element = tiltCardRef.current
+    if (!element) {
+      return
+    }
+
+    element.style.setProperty('--tilt-transform', 'perspective(900px) rotateX(0deg) rotateY(0deg) scale(1)')
+  }
+
   return (
     <div
       ref={setMeasuredElement}
@@ -273,9 +309,13 @@ function GalleryCard({
       }}
     >
       <div
-        className="bp-panel group w-full p-1"
+        ref={tiltCardRef}
+        className={`bp-panel group w-full p-1 ${enableHoverTilt ? 'masonry-tilt-card' : ''}`}
         role="button"
         tabIndex={0}
+        style={TILT_CARD_STYLE}
+        onPointerMove={handleTiltPointerMove}
+        onPointerLeave={handleTiltPointerLeave}
         onClick={() => onOpen(entry.index)}
         onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onOpen(entry.index) }}
       >
@@ -312,6 +352,22 @@ function GalleryCard({
       </div>
     </div>
   )
+}
+
+const TILT_CARD_STYLE = {
+  '--tilt-transform': 'perspective(900px) rotateX(0deg) rotateY(0deg) scale(1)',
+} as CSSProperties
+
+function canUseHoverTilt() {
+  return (
+    typeof window !== 'undefined' &&
+    window.innerWidth >= 768 &&
+    window.matchMedia('(hover: hover) and (pointer: fine)').matches
+  )
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max)
 }
 
 function formatCount(value: number) {

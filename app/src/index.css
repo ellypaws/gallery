@@ -430,6 +430,22 @@ code {
     color: #000000;
   }
 
+  .masonry-tilt-card {
+    position: relative;
+    overflow: hidden;
+    transform: var(--tilt-transform);
+    transform-style: preserve-3d;
+    will-change: transform;
+    transition: transform 0.16s ease, box-shadow 0.16s ease;
+  }
+
+  .masonry-tilt-card:hover {
+    box-shadow:
+      0 10px 20px rgba(0, 0, 0, 0.16),
+      inset 1px 1px 0 var(--bp-inset),
+      inset -1px -1px 0 var(--bp-border-dark);
+  }
+
   .forum-button-label {
     font-size: 11px;
     font-weight: 700;

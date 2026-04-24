@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { gsap } from 'gsap'
-import { Aperture, Camera, ChevronLeft, ChevronRight, Clock3, ExternalLink, Eye, Search, Star, X } from 'lucide-react'
+import { Aperture, Camera, ChevronLeft, ChevronRight, Clock3, ExternalLink, Search, Star, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 import type { GalleryItem } from '../lib/types'
@@ -344,28 +344,10 @@ export function Lightbox({
 
           </div>
 
-          <div className="shrink-0 p-2 pb-0">
-            <div className="bp-panel p-2">
-              <p className="m-0 mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-soft)]">Stats</p>
-              <div className="flex flex-wrap gap-x-5 gap-y-2">
-                <div className="lightbox-detail-row flex items-center gap-1.5 text-[11px] text-[var(--text)]">
-                  <Eye className="h-4 w-4 shrink-0 text-[var(--viewer-ink)]" />
-                  <span className="font-bold text-[var(--text-soft)]">Views</span>
-                  <span className="text-[var(--text-strong)]">{formatCount(photo.viewCount)}</span>
-                </div>
-                <div className="lightbox-detail-row flex items-center gap-1.5 text-[11px] text-[var(--text)]">
-                  <Star className={`h-4 w-4 shrink-0 text-[var(--viewer-ink)] ${photo.starred ? 'fill-current' : ''}`} />
-                  <span className="font-bold text-[var(--text-soft)]">Favorites</span>
-                  <span className="text-[var(--text-strong)]">{formatCount(photo.starCount)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
           {metaRows.length > 0 ? (
-            <div className="shrink-0 p-2">
-              <div className="bp-panel p-2">
-                <p className="m-0 mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-soft)]">EXIF</p>
+            <div className="shrink-0 p-2 pb-0">
+              <div className="forum-meta-box">
+                <p className="m-0 mb-2 text-[11px] font-bold text-[var(--viewer-ink)]">EXIF Data</p>
                 <div className="flex flex-wrap gap-x-5 gap-y-2">
                   {metaRows.map((row) => (
                     <div key={row.key} className="lightbox-detail-row flex items-center gap-1.5 text-[11px] text-[var(--text)]">
@@ -378,6 +360,22 @@ export function Lightbox({
               </div>
             </div>
           ) : null}
+
+          <div className="shrink-0 p-2">
+            <div className="forum-meta-box">
+              <p className="m-0 mb-2 text-[11px] font-bold text-[var(--viewer-ink)]">Stats</p>
+              <dl className="forum-meta-table text-[11px]">
+                <div className="lightbox-detail-row contents">
+                  <dt className="forum-meta-term">Views</dt>
+                  <dd className="forum-meta-desc">{formatCount(photo.viewCount)}</dd>
+                </div>
+                <div className="lightbox-detail-row contents">
+                  <dt className="forum-meta-term">Favorites</dt>
+                  <dd className="forum-meta-desc">{formatCount(photo.starCount)}</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -534,20 +532,6 @@ export function Lightbox({
                 </dl>
               </div>
 
-              <div className="forum-meta-box mt-2">
-                <p className="m-0 mb-2 text-[11px] font-bold text-[var(--viewer-ink)]">Stats</p>
-                <dl className="forum-meta-table text-[11px]">
-                  <div className="lightbox-detail-row contents">
-                    <dt className="forum-meta-term">Views</dt>
-                    <dd className="forum-meta-desc">{formatCount(photo.viewCount)}</dd>
-                  </div>
-                  <div className="lightbox-detail-row contents">
-                    <dt className="forum-meta-term">Favorites</dt>
-                    <dd className="forum-meta-desc">{formatCount(photo.starCount)}</dd>
-                  </div>
-                </dl>
-              </div>
-
               {metaRows.length ? (
                 <div className="forum-meta-box mt-2">
                   <p className="m-0 mb-2 text-[11px] font-bold text-[var(--viewer-ink)]">EXIF Data</p>
@@ -564,6 +548,20 @@ export function Lightbox({
                   </div>
                 </div>
               ) : null}
+
+              <div className="forum-meta-box mt-2">
+                <p className="m-0 mb-2 text-[11px] font-bold text-[var(--viewer-ink)]">Stats</p>
+                <dl className="forum-meta-table text-[11px]">
+                  <div className="lightbox-detail-row contents">
+                    <dt className="forum-meta-term">Views</dt>
+                    <dd className="forum-meta-desc">{formatCount(photo.viewCount)}</dd>
+                  </div>
+                  <div className="lightbox-detail-row contents">
+                    <dt className="forum-meta-term">Favorites</dt>
+                    <dd className="forum-meta-desc">{formatCount(photo.starCount)}</dd>
+                  </div>
+                </dl>
+              </div>
 
               {photo.description || photo.alt ? (
                 <div className="forum-meta-box mt-2">

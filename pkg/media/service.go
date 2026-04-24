@@ -396,21 +396,42 @@ func (s *Service) gallery(ctx context.Context, includeHidden bool, viewerHash st
 }
 
 func (s *Service) TrackView(ctx context.Context, photoID uint, viewerHash string) (GalleryInteraction, error) {
-	if viewerHash == "" {
-		return GalleryInteraction{}, errors.New("missing viewer")
-	}
-
-	s.dbMu.Lock()
-	err := s.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&models.PhotoView{
-		PhotoID:    photoID,
-		ViewerHash: viewerHash,
-	}).Error
-	s.dbMu.Unlock()
+	interactions, err := s.TrackViews(ctx, []uint{photoID}, viewerHash)
 	if err != nil {
 		return GalleryInteraction{}, err
 	}
+	if len(interactions) == 0 {
+		return GalleryInteraction{}, errors.New("missing interaction")
+	}
+	return interactions[0], nil
+}
 
-	return s.photoInteraction(ctx, photoID, viewerHash)
+func (s *Service) TrackViews(ctx context.Context, photoIDs []uint, viewerHash string) ([]GalleryInteraction, error) {
+	if viewerHash == "" {
+		return nil, errors.New("missing viewer")
+	}
+
+	photoIDs = uniquePhotoIDs(photoIDs)
+	if len(photoIDs) == 0 {
+		return []GalleryInteraction{}, nil
+	}
+
+	rows := make([]models.PhotoView, 0, len(photoIDs))
+	for _, photoID := range photoIDs {
+		rows = append(rows, models.PhotoView{
+			PhotoID:    photoID,
+			ViewerHash: viewerHash,
+		})
+	}
+
+	s.dbMu.Lock()
+	err := s.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&rows).Error
+	s.dbMu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+
+	return s.photoInteractions(ctx, photoIDs, viewerHash)
 }
 
 func (s *Service) TrackClick(ctx context.Context, photoID uint, viewerHash string) (GalleryInteraction, error) {
@@ -480,18 +501,34 @@ func (s *Service) ToggleStar(ctx context.Context, photoID uint, viewerHash strin
 }
 
 func (s *Service) photoInteraction(ctx context.Context, photoID uint, viewerHash string) (GalleryInteraction, error) {
-	stats, err := s.interactionStats(ctx, []uint{photoID}, viewerHash)
+	interactions, err := s.photoInteractions(ctx, []uint{photoID}, viewerHash)
 	if err != nil {
 		return GalleryInteraction{}, err
 	}
+	if len(interactions) == 0 {
+		return GalleryInteraction{}, errors.New("missing interaction")
+	}
+	return interactions[0], nil
+}
 
-	return GalleryInteraction{
-		PhotoID:    photoID,
-		ViewCount:  stats.viewCounts[photoID],
-		ClickCount: stats.clickCounts[photoID],
-		StarCount:  stats.starCounts[photoID],
-		Starred:    stats.viewerStars[photoID],
-	}, nil
+func (s *Service) photoInteractions(ctx context.Context, photoIDs []uint, viewerHash string) ([]GalleryInteraction, error) {
+	photoIDs = uniquePhotoIDs(photoIDs)
+	stats, err := s.interactionStats(ctx, photoIDs, viewerHash)
+	if err != nil {
+		return nil, err
+	}
+
+	interactions := make([]GalleryInteraction, 0, len(photoIDs))
+	for _, photoID := range photoIDs {
+		interactions = append(interactions, GalleryInteraction{
+			PhotoID:    photoID,
+			ViewCount:  stats.viewCounts[photoID],
+			ClickCount: stats.clickCounts[photoID],
+			StarCount:  stats.starCounts[photoID],
+			Starred:    stats.viewerStars[photoID],
+		})
+	}
+	return interactions, nil
 }
 
 func (s *Service) interactionStats(ctx context.Context, photoIDs []uint, viewerHash string) (interactionStats, error) {
@@ -833,6 +870,22 @@ func normalizeRelativePath(path string) string {
 	clean := filepath.ToSlash(filepath.Clean(path))
 	clean = strings.TrimPrefix(clean, "./")
 	return strings.TrimPrefix(clean, "/")
+}
+
+func uniquePhotoIDs(photoIDs []uint) []uint {
+	seen := map[uint]struct{}{}
+	result := make([]uint, 0, len(photoIDs))
+	for _, photoID := range photoIDs {
+		if photoID == 0 {
+			continue
+		}
+		if _, ok := seen[photoID]; ok {
+			continue
+		}
+		seen[photoID] = struct{}{}
+		result = append(result, photoID)
+	}
+	return result
 }
 
 func escapeLike(value string) string {

@@ -7,7 +7,7 @@ import { Lightbox } from './components/Lightbox'
 import { MasonryGallery } from './components/MasonryGallery'
 import { BarLoader } from './components/BarLoader.tsx'
 import { useTheme } from './hooks/useTheme'
-import { fetchAdminGallery, fetchGallery, togglePhotoStar, trackPhotoClick, trackPhotoView } from './lib/api'
+import { fetchAdminGallery, fetchGallery, togglePhotoStar, trackPhotoClick, trackPhotoViews } from './lib/api'
 import type { GalleryInteraction, GalleryItem } from './lib/types'
 
 const MASONRY_STORAGE_KEY = 'gallery-masonry'
@@ -15,14 +15,15 @@ const GROUPED_STORAGE_KEY = 'gallery-grouped'
 const VIEWED_STORAGE_KEY = 'gallery-viewed-photos'
 const CLICKED_STORAGE_KEY = 'gallery-clicked-photos'
 const STARRED_STORAGE_KEY = 'gallery-starred-photos'
-const VIEW_DEBOUNCE_MS = 450
+const VIEW_BATCH_DEBOUNCE_MS = 450
 
 function App() {
   const { theme, toggleTheme } = useTheme()
   const shellRef = useRef<HTMLDivElement | null>(null)
   const viewedPhotoIdsRef = useRef<Set<number>>(readStoredNumberSet(VIEWED_STORAGE_KEY))
   const clickedPhotoIdsRef = useRef<Set<number>>(readStoredNumberSet(CLICKED_STORAGE_KEY))
-  const viewTimersRef = useRef<Map<number, number>>(new Map())
+  const queuedViewIdsRef = useRef<Set<number>>(new Set())
+  const viewBatchTimerRef = useRef<number | null>(null)
   const pendingViewsRef = useRef<Set<number>>(new Set())
   const pendingClicksRef = useRef<Set<number>>(new Set())
   const pendingStarsRef = useRef<Set<number>>(new Set())
@@ -107,13 +108,11 @@ function App() {
   }, [isAdmin, photos.length, isFetching])
 
   useEffect(() => {
-    const timers = viewTimersRef.current
-
     return () => {
-      for (const timer of timers.values()) {
-        window.clearTimeout(timer)
+      if (viewBatchTimerRef.current !== null) {
+        window.clearTimeout(viewBatchTimerRef.current)
+        viewBatchTimerRef.current = null
       }
-      timers.clear()
     }
   }, [])
 
@@ -149,33 +148,57 @@ function App() {
       return
     }
 
-    const existingTimer = viewTimersRef.current.get(photoID)
-    if (existingTimer) {
-      window.clearTimeout(existingTimer)
+    queuedViewIdsRef.current.add(photoID)
+    scheduleViewBatchFlush()
+  }
+
+  function scheduleViewBatchFlush() {
+    if (viewBatchTimerRef.current !== null) {
+      window.clearTimeout(viewBatchTimerRef.current)
     }
 
-    const timer = window.setTimeout(() => {
-      viewTimersRef.current.delete(photoID)
-      if (viewedPhotoIdsRef.current.has(photoID) || pendingViewsRef.current.has(photoID)) {
-        return
-      }
+    viewBatchTimerRef.current = window.setTimeout(() => {
+      viewBatchTimerRef.current = null
+      void flushQueuedPhotoViews()
+    }, VIEW_BATCH_DEBOUNCE_MS)
+  }
 
+  async function flushQueuedPhotoViews(requiredPhotoID?: number) {
+    if (viewBatchTimerRef.current !== null) {
+      window.clearTimeout(viewBatchTimerRef.current)
+      viewBatchTimerRef.current = null
+    }
+
+    if (requiredPhotoID && !viewedPhotoIdsRef.current.has(requiredPhotoID)) {
+      queuedViewIdsRef.current.add(requiredPhotoID)
+    }
+
+    const photoIDs = [...queuedViewIdsRef.current].filter(
+      (photoID) => !viewedPhotoIdsRef.current.has(photoID) && !pendingViewsRef.current.has(photoID),
+    )
+    queuedViewIdsRef.current.clear()
+    if (photoIDs.length === 0) {
+      return
+    }
+
+    for (const photoID of photoIDs) {
       pendingViewsRef.current.add(photoID)
-      void trackPhotoView(photoID)
-        .then((interaction) => {
-          viewedPhotoIdsRef.current.add(photoID)
-          writeStoredNumberSet(VIEWED_STORAGE_KEY, viewedPhotoIdsRef.current)
-          applyInteraction(interaction)
-        })
-        .catch(() => {
-          // Ignore interaction failures so viewing the gallery never blocks.
-        })
-        .finally(() => {
-          pendingViewsRef.current.delete(photoID)
-        })
-    }, VIEW_DEBOUNCE_MS)
+    }
 
-    viewTimersRef.current.set(photoID, timer)
+    try {
+      const response = await trackPhotoViews(photoIDs)
+      for (const interaction of response.interactions) {
+        viewedPhotoIdsRef.current.add(interaction.photoId)
+        applyInteraction(interaction)
+      }
+      writeStoredNumberSet(VIEWED_STORAGE_KEY, viewedPhotoIdsRef.current)
+    } catch {
+      // Ignore interaction failures so viewing the gallery never blocks.
+    } finally {
+      for (const photoID of photoIDs) {
+        pendingViewsRef.current.delete(photoID)
+      }
+    }
   }
 
   function applyInteraction(interaction: GalleryInteraction, exactCounts = false) {
@@ -194,22 +217,10 @@ function App() {
     )
   }
 
-  function clearScheduledPhotoView(photoID: number) {
-    const existingTimer = viewTimersRef.current.get(photoID)
-    if (!existingTimer) {
-      return
-    }
-
-    window.clearTimeout(existingTimer)
-    viewTimersRef.current.delete(photoID)
-  }
-
   function handlePhotoClick(photoID: number) {
-    clearScheduledPhotoView(photoID)
-
     if (clickedPhotoIdsRef.current.has(photoID)) {
       if (!viewedPhotoIdsRef.current.has(photoID)) {
-        schedulePhotoView(photoID)
+        void flushQueuedPhotoViews(photoID)
       }
       return
     }
@@ -218,7 +229,8 @@ function App() {
     }
 
     pendingClicksRef.current.add(photoID)
-    void trackPhotoClick(photoID)
+    void flushQueuedPhotoViews(photoID)
+      .then(() => trackPhotoClick(photoID))
       .then((interaction) => {
         viewedPhotoIdsRef.current.add(photoID)
         clickedPhotoIdsRef.current.add(photoID)

@@ -56,6 +56,7 @@ func New(cfg config.Config, logger *log.Logger, mediaService *media.Service) *Ap
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
 	e.GET("/api/gallery", handler.GetGallery)
+	e.POST("/api/photos/views", handler.TrackViews)
 	e.POST("/api/photos/:id/view", handler.TrackView)
 	e.POST("/api/photos/:id/click", handler.TrackClick)
 	e.POST("/api/photos/:id/star", handler.ToggleStar)

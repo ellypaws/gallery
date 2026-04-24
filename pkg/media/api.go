@@ -21,6 +21,10 @@ type Handler struct {
 	service *Service
 }
 
+type trackViewsInput struct {
+	PhotoIDs []uint `json:"photo_ids"`
+}
+
 func NewHandler(cfg config.Config, service *Service) *Handler {
 	return &Handler{cfg: cfg, service: service}
 }
@@ -126,6 +130,20 @@ func (h *Handler) TrackView(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, interaction)
+}
+
+func (h *Handler) TrackViews(c echo.Context) error {
+	var input trackViewsInput
+	if err := c.Bind(&input); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid payload")
+	}
+
+	interactions, err := h.service.TrackViews(c.Request().Context(), input.PhotoIDs, viewerHash(c))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{"interactions": interactions})
 }
 
 func (h *Handler) TrackClick(c echo.Context) error {

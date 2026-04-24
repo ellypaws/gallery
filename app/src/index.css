@@ -92,6 +92,18 @@ body,
   scrollbar-gutter: stable;
 }
 
+html.forum-admin-native-scroll,
+html.forum-admin-native-scroll body,
+html.forum-admin-native-scroll #root {
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+}
+
+html.forum-admin-native-scroll body {
+  overflow-y: auto;
+}
+
 *,
 *::before,
 *::after {
@@ -169,6 +181,20 @@ code {
     min-height: calc(100vh - 16px);
     flex-direction: column;
     gap: 8px;
+  }
+
+  .forum-admin-shell {
+    height: auto;
+    overflow: visible;
+  }
+
+  .forum-admin-page {
+    height: auto;
+    min-height: calc(100vh - 16px);
+  }
+
+  .forum-admin-page .forum-window {
+    flex-shrink: 0;
   }
 
   .forum-window-host {
@@ -756,6 +782,26 @@ code {
 
   ::-webkit-scrollbar-corner, *::-webkit-scrollbar-corner {
     background: var(--bg);
+  }
+
+  html.forum-admin-native-scroll,
+  html.forum-admin-native-scroll * {
+    scrollbar-color: auto;
+  }
+
+  html.forum-admin-native-scroll::-webkit-scrollbar,
+  html.forum-admin-native-scroll *::-webkit-scrollbar,
+  html.forum-admin-native-scroll::-webkit-scrollbar-track,
+  html.forum-admin-native-scroll *::-webkit-scrollbar-track,
+  html.forum-admin-native-scroll::-webkit-scrollbar-track-piece,
+  html.forum-admin-native-scroll *::-webkit-scrollbar-track-piece,
+  html.forum-admin-native-scroll::-webkit-scrollbar-thumb,
+  html.forum-admin-native-scroll *::-webkit-scrollbar-thumb,
+  html.forum-admin-native-scroll::-webkit-scrollbar-button,
+  html.forum-admin-native-scroll *::-webkit-scrollbar-button,
+  html.forum-admin-native-scroll::-webkit-scrollbar-corner,
+  html.forum-admin-native-scroll *::-webkit-scrollbar-corner {
+    all: revert;
   }
 
 }

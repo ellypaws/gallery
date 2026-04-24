@@ -43,6 +43,14 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
   )
 
   useEffect(() => {
+    document.documentElement.classList.add('forum-admin-native-scroll')
+
+    return () => {
+      document.documentElement.classList.remove('forum-admin-native-scroll')
+    }
+  }, [])
+
+  useEffect(() => {
     setDrafts(
       Object.fromEntries(
         photos.map((photo) => [
@@ -139,8 +147,8 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
   }
 
   return (
-    <main className="forum-app-shell">
-      <div className="forum-page">
+    <main className="forum-app-shell forum-admin-shell">
+      <div className="forum-page forum-admin-page">
         <section className="forum-window">
           <div className="forum-window-bar">
             <div className="forum-window-title">Gallery Intake</div>

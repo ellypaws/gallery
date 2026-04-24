@@ -19,6 +19,7 @@ export default defineConfig({
       '/api': 'http://localhost:8080',
       '/media': 'http://localhost:8080',
       '/admin': 'http://localhost:8080',
+      '/assets': 'http://localhost:8080',
     },
   },
 })

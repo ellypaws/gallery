@@ -5,6 +5,8 @@ import { Star } from 'lucide-react'
 import type { GalleryItem } from '../lib/types'
 
 const CARD_CAPTION_HEIGHT = 50
+const MASONRY_LANDSCAPE_RATIOS = [0.666, 0.75, 0.875]
+const MASONRY_SQUARE_RATIOS = [1]
 
 type MasonryGalleryProps = {
   photos?: GalleryItem[]
@@ -75,8 +77,7 @@ export function MasonryGallery({ photos, items, onOpen, onView, enableHoverTilt,
       let cssRatio = `${photo.width} / ${photo.height}`
 
       if (isMasonry) {
-        const ratios = [1.0, 1.333, 0.75, 1.5, 0.666]
-        calcRatio = ratios[photo.id % ratios.length]
+        calcRatio = getMasonryDisplayRatio(photo)
         cssRatio = `${1 / calcRatio}`
       }
 
@@ -368,6 +369,17 @@ function canUseHoverTilt() {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
+}
+
+function getMasonryDisplayRatio(photo: GalleryItem) {
+  const intrinsicRatio = photo.height / photo.width
+  if (intrinsicRatio > 1) {
+    return intrinsicRatio
+  }
+
+  const ratios = intrinsicRatio < 1 ? MASONRY_LANDSCAPE_RATIOS : MASONRY_SQUARE_RATIOS
+
+  return ratios[photo.id % ratios.length]
 }
 
 function formatCount(value: number) {

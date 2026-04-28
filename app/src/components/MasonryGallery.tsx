@@ -1,6 +1,6 @@
 import { type CSSProperties, type PointerEvent, useCallback, useEffect, useLayoutEffect, useRef, useMemo, useState } from 'react'
 import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual'
-import { Film, Star } from 'lucide-react'
+import { Star } from 'lucide-react'
 
 import type { GalleryItem } from '../lib/types'
 
@@ -325,21 +325,16 @@ function GalleryCard({
           style={{ aspectRatio: entry.aspectRatio }}
         >
           {entry.photo.mediaType === 'video' ? (
-            <>
-              <video
-                src={entry.photo.src}
-                poster={entry.photo.placeholder}
-                muted
-                loop
-                autoPlay
-                playsInline
-                preload="metadata"
-                className="block h-full w-full object-cover transition-opacity duration-200 group-hover:opacity-90"
-              />
-              <span className="absolute left-2 top-2 inline-flex h-6 min-w-6 items-center justify-center border border-white/90 bg-black/55 px-1 text-white/90 shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
-                <Film className="h-3.5 w-3.5" />
-              </span>
-            </>
+            <video
+              src={entry.photo.src}
+              poster={entry.photo.placeholder}
+              muted
+              loop
+              autoPlay
+              playsInline
+              preload="metadata"
+              className="block h-full w-full object-cover transition-opacity duration-200 group-hover:opacity-90"
+            />
           ) : (
             <img
               src={entry.photo.src}

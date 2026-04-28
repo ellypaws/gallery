@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"mime"
 	"os"
 	"path/filepath"
@@ -17,6 +18,7 @@ import (
 	"gallery/pkg/images"
 	"gallery/pkg/models"
 	"gallery/pkg/utils"
+	"gallery/pkg/video"
 
 	"github.com/charmbracelet/log"
 	"gorm.io/gorm"
@@ -38,15 +40,18 @@ type GalleryResponse struct {
 
 type GalleryItem struct {
 	ID              uint       `json:"id"`
+	MediaType       string     `json:"mediaType"`
 	Title           string     `json:"title"`
 	Alt             string     `json:"alt"`
 	Description     string     `json:"description"`
 	Width           int        `json:"width"`
 	Height          int        `json:"height"`
+	Duration        float64    `json:"duration"`
 	Src             string     `json:"src"`
 	OriginalSrc     string     `json:"originalSrc"`
 	Placeholder     string     `json:"placeholder"`
 	SrcSet          string     `json:"srcSet"`
+	Sources         []Source   `json:"sources"`
 	Sizes           string     `json:"sizes"`
 	Camera          string     `json:"camera"`
 	Lens            string     `json:"lens"`
@@ -66,6 +71,16 @@ type GalleryItem struct {
 	ClickCount      int64      `json:"clickCount"`
 	StarCount       int64      `json:"starCount"`
 	Starred         bool       `json:"starred"`
+}
+
+type Source struct {
+	Label    string  `json:"label"`
+	Src      string  `json:"src"`
+	Width    int     `json:"width"`
+	Height   int     `json:"height"`
+	MimeType string  `json:"mimeType"`
+	Bitrate  int64   `json:"bitrate"`
+	Duration float64 `json:"duration"`
 }
 
 type GalleryInteraction struct {
@@ -113,7 +128,7 @@ func (s *Service) SyncLibrary(ctx context.Context) error {
 		if d.IsDir() {
 			return nil
 		}
-		if utils.IsSupportedImage(path) {
+		if utils.IsSupportedMedia(path) {
 			files = append(files, path)
 		}
 		return nil
@@ -170,6 +185,10 @@ func (s *Service) SyncLibrary(ctx context.Context) error {
 }
 
 func (s *Service) syncFile(absPath string) (uint, error) {
+	if !utils.IsSupportedMedia(absPath) {
+		return 0, nil
+	}
+
 	relPath, err := filepath.Rel(s.cfg.MediaDir, absPath)
 	if err != nil {
 		return 0, err
@@ -204,47 +223,25 @@ func (s *Service) syncFile(absPath string) (uint, error) {
 
 	modified := photo.ID != 0 && photo.Hash != "" && photo.Hash != hash
 	previousPhoto := photo
+	mediaType := mediaTypeForPath(absPath)
+
 	if modified {
-		s.logger.Info("processing modified image", "path", relPath, "old_hash", photo.Hash, "hash", hash)
+		s.logger.Info("processing modified media", "path", relPath, "old_hash", photo.Hash, "hash", hash)
 	} else {
-		s.logger.Info("processing new image", "path", relPath, "hash", hash)
+		s.logger.Info("processing new media", "path", relPath, "hash", hash)
 	}
 
-	exifMeta, err := images.ExtractExif(absPath)
+	processed, exifMeta, err := s.processMedia(absPath, hash, mediaType)
 	if err != nil {
-		s.logger.Warn("exif extraction failed", "path", absPath, "err", err)
-	}
-
-	processed, err := images.ProcessImage(absPath, s.cfg.CacheDir, hash, s.logger)
-	if err != nil {
-		s.logger.Error("failed to process image derivatives", "path", absPath, "err", err)
 		return 0, err
-	}
-
-	scrubbedSubdir := filepath.Join(s.cfg.CacheDir, "originals", hash[:2], hash[2:4])
-	_ = os.MkdirAll(scrubbedSubdir, 0o755)
-	scrubbedOriginal := filepath.Join(scrubbedSubdir, hash+".jpg")
-
-	if err := images.SaveOriginalJpeg(absPath, scrubbedOriginal, exifMeta, s.logger); err != nil {
-		s.logger.Warn("failed to create scrubbed original", "path", absPath, "err", err)
-	}
-
-	normalizedExif := exifMeta
-	normalizedExif.Orientation = 1
-
-	for _, derivative := range processed.Derivatives {
-		dPath := filepath.Join(s.cfg.CacheDir, derivative.RelativePath)
-		_ = images.ScrubAndSaveJpeg(dPath, dPath, normalizedExif, s.logger)
-	}
-	if processed.Placeholder != "" {
-		pPath := filepath.Join(s.cfg.CacheDir, processed.Placeholder)
-		_ = images.ScrubAndSaveJpeg(pPath, pPath, normalizedExif, s.logger)
 	}
 
 	photo.RelativePath = relPath
 	photo.Hash = hash
 	photo.Width = processed.Width
 	photo.Height = processed.Height
+	photo.Duration = processed.Duration
+	photo.MediaType = mediaType
 	photo.ByteSize = stat.Size()
 	photo.MimeType = mime.TypeByExtension(strings.ToLower(filepath.Ext(absPath)))
 	if photo.MimeType == "" {
@@ -319,6 +316,98 @@ func (s *Service) syncFile(absPath string) (uint, error) {
 	}
 
 	return photo.ID, nil
+}
+
+type processedMedia struct {
+	Width       int
+	Height      int
+	Duration    float64
+	MimeType    string
+	Placeholder string
+	Derivatives []processedDerivative
+}
+
+type processedDerivative struct {
+	Variant      string
+	RelativePath string
+	Width        int
+	Height       int
+	ByteSize     int64
+	MimeType     string
+}
+
+func (s *Service) processMedia(absPath, hash, mediaType string) (processedMedia, images.ExifMetadata, error) {
+	if mediaType == "video" {
+		processor := video.NewProcessor()
+		processed, err := processor.Process(context.Background(), absPath, s.cfg.CacheDir, hash, s.logger)
+		if err != nil {
+			s.logger.Error("failed to process video derivatives", "path", absPath, "err", err)
+			return processedMedia{}, images.ExifMetadata{}, err
+		}
+		return processedVideoToMedia(processed), images.ExifMetadata{}, nil
+	}
+
+	exifMeta, err := images.ExtractExif(absPath)
+	if err != nil {
+		s.logger.Warn("exif extraction failed", "path", absPath, "err", err)
+	}
+
+	processed, err := images.ProcessImage(absPath, s.cfg.CacheDir, hash, s.logger)
+	if err != nil {
+		s.logger.Error("failed to process image derivatives", "path", absPath, "err", err)
+		return processedMedia{}, images.ExifMetadata{}, err
+	}
+
+	scrubbedSubdir := filepath.Join(s.cfg.CacheDir, "originals", hash[:2], hash[2:4])
+	_ = os.MkdirAll(scrubbedSubdir, 0o755)
+	scrubbedOriginal := filepath.Join(scrubbedSubdir, hash+".jpg")
+
+	if err := images.SaveOriginalJpeg(absPath, scrubbedOriginal, exifMeta, s.logger); err != nil {
+		s.logger.Warn("failed to create scrubbed original", "path", absPath, "err", err)
+	}
+
+	normalizedExif := exifMeta
+	normalizedExif.Orientation = 1
+
+	for _, derivative := range processed.Derivatives {
+		dPath := filepath.Join(s.cfg.CacheDir, derivative.RelativePath)
+		_ = images.ScrubAndSaveJpeg(dPath, dPath, normalizedExif, s.logger)
+	}
+	if processed.Placeholder != "" {
+		pPath := filepath.Join(s.cfg.CacheDir, processed.Placeholder)
+		_ = images.ScrubAndSaveJpeg(pPath, pPath, normalizedExif, s.logger)
+	}
+
+	return processedImageToMedia(processed), exifMeta, nil
+}
+
+func processedImageToMedia(processed images.ProcessedImage) processedMedia {
+	derivatives := make([]processedDerivative, 0, len(processed.Derivatives))
+	for _, derivative := range processed.Derivatives {
+		derivatives = append(derivatives, processedDerivative(derivative))
+	}
+	return processedMedia{
+		Width:       processed.Width,
+		Height:      processed.Height,
+		MimeType:    processed.MimeType,
+		Placeholder: processed.Placeholder,
+		Derivatives: derivatives,
+	}
+}
+
+func processedVideoToMedia(processed video.ProcessedVideo) processedMedia {
+	derivatives := make([]processedDerivative, 0, len(processed.Derivatives))
+	for _, derivative := range processed.Derivatives {
+		derivatives = append(derivatives, processedDerivative(derivative))
+	}
+	return processedMedia{
+		Width:       processed.Width,
+		Height:      processed.Height,
+		Duration:    processed.Duration,
+		MimeType:    processed.MimeType,
+		Placeholder: processed.Placeholder,
+		Derivatives: derivatives,
+	}
 }
 
 func (s *Service) Gallery(ctx context.Context, viewerHash string) (GalleryResponse, error) {
@@ -613,6 +702,9 @@ func (s *Service) UploadFiles(ctx context.Context, filenames []string) error {
 
 		relPath := normalizeRelativePath(name)
 		absPath := filepath.Join(s.cfg.MediaDir, filepath.FromSlash(relPath))
+		if !utils.IsSupportedMedia(absPath) {
+			return nil
+		}
 		if _, err := os.Stat(absPath); err != nil {
 			if errors.Is(err, os.ErrNotExist) {
 				return s.deleteMissingPath(relPath)
@@ -712,8 +804,17 @@ func (s *Service) UpdateOverride(ctx context.Context, photoID uint, input PhotoO
 }
 
 func (s *Service) toGalleryItem(photo models.Photo) GalleryItem {
+	mediaType := normalizeMediaType(photo)
 	largest := pickLargestDerivative(photo.Derivatives)
+	display := largest
+	if mediaType == "video" {
+		largest = pickLargestVideoDerivative(photo.Derivatives)
+		display = pickSmallestVideoDerivative(photo.Derivatives)
+	}
 	placeholder := pickVariant(photo.Derivatives, "placeholder")
+	if mediaType == "video" {
+		placeholder = pickVariant(photo.Derivatives, "poster")
+	}
 	title := strings.TrimSpace(photo.Override.Title)
 	if title == "" {
 		title = utils.HumanizeFilename(photo.RelativePath)
@@ -730,15 +831,18 @@ func (s *Service) toGalleryItem(photo models.Photo) GalleryItem {
 
 	return GalleryItem{
 		ID:              photo.ID,
+		MediaType:       mediaType,
 		Title:           title,
 		Alt:             alt,
 		Description:     photo.Override.Description,
 		Width:           photo.Width,
 		Height:          photo.Height,
-		Src:             s.cfg.CacheURL(largest.RelativePath),
-		OriginalSrc:     s.cfg.CacheURL(filepath.ToSlash(filepath.Join("originals", photo.Hash[:2], photo.Hash[2:4], photo.Hash+".jpg"))),
+		Duration:        photo.Duration,
+		Src:             s.cfg.CacheURL(display.RelativePath),
+		OriginalSrc:     s.originalURL(photo, mediaType, largest),
 		Placeholder:     s.cfg.CacheURL(placeholder.RelativePath),
-		SrcSet:          buildSrcSet(s.cfg, photo.Derivatives),
+		SrcSet:          buildSrcSet(s.cfg, photo.Derivatives, mediaType),
+		Sources:         buildSources(s.cfg, photo.Derivatives, photo.Duration),
 		Sizes:           "(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw",
 		Camera:          strings.TrimSpace(strings.TrimSpace(photo.Exif.CameraMake + " " + photo.Exif.CameraModel)),
 		Lens:            lensModel,
@@ -757,7 +861,23 @@ func (s *Service) toGalleryItem(photo models.Photo) GalleryItem {
 	}
 }
 
-func buildSrcSet(cfg config.Config, rows []models.Derivative) string {
+func (s *Service) originalURL(photo models.Photo, mediaType string, largest models.Derivative) string {
+	if mediaType == "video" {
+		if largest.RelativePath != "" {
+			return s.cfg.CacheURL(largest.RelativePath)
+		}
+		return s.cfg.OriginalURL(photo.RelativePath)
+	}
+	if len(photo.Hash) >= 4 {
+		return s.cfg.CacheURL(filepath.ToSlash(filepath.Join("originals", photo.Hash[:2], photo.Hash[2:4], photo.Hash+".jpg")))
+	}
+	return s.cfg.OriginalURL(photo.RelativePath)
+}
+
+func buildSrcSet(cfg config.Config, rows []models.Derivative, mediaType string) string {
+	if mediaType == "video" {
+		return ""
+	}
 	parts := make([]string, 0, len(rows))
 	for _, row := range rows {
 		if row.Variant != "responsive" {
@@ -769,6 +889,28 @@ func buildSrcSet(cfg config.Config, rows []models.Derivative) string {
 	return strings.Join(parts, ", ")
 }
 
+func buildSources(cfg config.Config, rows []models.Derivative, duration float64) []Source {
+	sources := make([]Source, 0, len(rows))
+	for _, row := range rows {
+		if !strings.HasPrefix(row.Variant, "video-") {
+			continue
+		}
+		sources = append(sources, Source{
+			Label:    strings.TrimPrefix(row.Variant, "video-"),
+			Src:      cfg.CacheURL(row.RelativePath),
+			Width:    row.Width,
+			Height:   row.Height,
+			MimeType: row.MimeType,
+			Bitrate:  bitrateFor(row.ByteSize, duration),
+			Duration: duration,
+		})
+	}
+	sort.Slice(sources, func(i, j int) bool {
+		return sources[i].Height < sources[j].Height
+	})
+	return sources
+}
+
 func pickLargestDerivative(rows []models.Derivative) models.Derivative {
 	best := models.Derivative{}
 	for _, row := range rows {
@@ -776,6 +918,32 @@ func pickLargestDerivative(rows []models.Derivative) models.Derivative {
 			continue
 		}
 		if row.Width > best.Width {
+			best = row
+		}
+	}
+	return best
+}
+
+func pickLargestVideoDerivative(rows []models.Derivative) models.Derivative {
+	best := models.Derivative{}
+	for _, row := range rows {
+		if !strings.HasPrefix(row.Variant, "video-") {
+			continue
+		}
+		if row.Height > best.Height {
+			best = row
+		}
+	}
+	return best
+}
+
+func pickSmallestVideoDerivative(rows []models.Derivative) models.Derivative {
+	best := models.Derivative{}
+	for _, row := range rows {
+		if !strings.HasPrefix(row.Variant, "video-") {
+			continue
+		}
+		if best.ID == 0 || row.Height < best.Height {
 			best = row
 		}
 	}
@@ -855,7 +1023,7 @@ func (s *Service) removeCachedPhotoAssets(photo models.Photo) {
 	for _, derivative := range photo.Derivatives {
 		cachePaths = append(cachePaths, filepath.Join(s.cfg.CacheDir, filepath.FromSlash(derivative.RelativePath)))
 	}
-	if len(photo.Hash) >= 4 {
+	if normalizeMediaType(photo) == "image" && len(photo.Hash) >= 4 {
 		cachePaths = append(cachePaths, filepath.Join(s.cfg.CacheDir, "originals", photo.Hash[:2], photo.Hash[2:4], photo.Hash+".jpg"))
 	}
 
@@ -864,6 +1032,30 @@ func (s *Service) removeCachedPhotoAssets(photo models.Photo) {
 			s.logger.Warn("failed to remove cached derivative", "path", cachePath, "err", err)
 		}
 	}
+}
+
+func mediaTypeForPath(path string) string {
+	if utils.IsSupportedVideo(path) {
+		return "video"
+	}
+	return "image"
+}
+
+func normalizeMediaType(photo models.Photo) string {
+	if photo.MediaType != "" {
+		return photo.MediaType
+	}
+	if strings.HasPrefix(photo.MimeType, "video/") || utils.IsSupportedVideo(photo.RelativePath) {
+		return "video"
+	}
+	return "image"
+}
+
+func bitrateFor(byteSize int64, duration float64) int64 {
+	if byteSize <= 0 || duration <= 0 {
+		return 0
+	}
+	return int64(math.Round(float64(byteSize*8) / duration))
 }
 
 func normalizeRelativePath(path string) string {

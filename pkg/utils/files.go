@@ -19,6 +19,19 @@ func IsSupportedImage(path string) bool {
 	}
 }
 
+func IsSupportedVideo(path string) bool {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi", ".mpeg", ".mpg", ".3gp", ".ogv":
+		return true
+	default:
+		return false
+	}
+}
+
+func IsSupportedMedia(path string) bool {
+	return IsSupportedImage(path) || IsSupportedVideo(path)
+}
+
 func IsJPEG(path string) bool {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".jpg", ".jpeg":

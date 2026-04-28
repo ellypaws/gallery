@@ -58,7 +58,7 @@ func (h *Handler) Upload(c echo.Context) error {
 
 	saved := make([]string, 0, len(files))
 	for _, fileHeader := range files {
-		if !utils.IsSupportedImage(fileHeader.Filename) {
+		if !utils.IsSupportedMedia(fileHeader.Filename) {
 			continue
 		}
 

@@ -10,6 +10,8 @@ type Photo struct {
 	Hash         string `gorm:"index;not null"`
 	Width        int
 	Height       int
+	Duration     float64
+	MediaType    string `gorm:"index;not null;default:image"`
 	ByteSize     int64
 	MimeType     string
 	TakenAt      *time.Time

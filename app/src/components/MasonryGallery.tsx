@@ -1,6 +1,6 @@
 import { type CSSProperties, type PointerEvent, useCallback, useEffect, useLayoutEffect, useRef, useMemo, useState } from 'react'
 import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual'
-import { Star } from 'lucide-react'
+import { Film, Star } from 'lucide-react'
 
 import type { GalleryItem } from '../lib/types'
 
@@ -321,18 +321,36 @@ function GalleryCard({
         onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onOpen(entry.index) }}
       >
         <div
-          className="bp-inset w-full shrink-0 overflow-hidden"
+          className="bp-inset relative w-full shrink-0 overflow-hidden"
           style={{ aspectRatio: entry.aspectRatio }}
         >
-          <img
-            src={entry.photo.src}
-            srcSet={entry.photo.srcSet}
-            sizes={coverSlotWidth > 0 ? `${coverSlotWidth}px` : entry.photo.sizes}
-            alt={entry.photo.alt}
-            loading="lazy"
-            decoding="async"
-            className="block h-full w-full object-cover transition-opacity duration-200 group-hover:opacity-90"
-          />
+          {entry.photo.mediaType === 'video' ? (
+            <>
+              <video
+                src={entry.photo.src}
+                poster={entry.photo.placeholder}
+                muted
+                loop
+                autoPlay
+                playsInline
+                preload="metadata"
+                className="block h-full w-full object-cover transition-opacity duration-200 group-hover:opacity-90"
+              />
+              <span className="absolute left-2 top-2 inline-flex h-6 min-w-6 items-center justify-center border border-white/90 bg-black/55 px-1 text-white/90 shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
+                <Film className="h-3.5 w-3.5" />
+              </span>
+            </>
+          ) : (
+            <img
+              src={entry.photo.src}
+              srcSet={entry.photo.srcSet}
+              sizes={coverSlotWidth > 0 ? `${coverSlotWidth}px` : entry.photo.sizes}
+              alt={entry.photo.alt}
+              loading="lazy"
+              decoding="async"
+              className="block h-full w-full object-cover transition-opacity duration-200 group-hover:opacity-90"
+            />
+          )}
         </div>
 
         <div className="flex flex-col justify-between px-1 pb-1 pt-2">

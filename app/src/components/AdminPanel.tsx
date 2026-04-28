@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ImagePlus, LoaderCircle, RefreshCcw, Save } from 'lucide-react'
+import { Film, ImagePlus, LoaderCircle, RefreshCcw, Save } from 'lucide-react'
 
 import { patchPhoto, rescanLibrary, uploadPhotos } from '../lib/api'
 import type { GalleryItem } from '../lib/types'
@@ -166,7 +166,7 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
                   <p className="forum-kicker">Internal Archive Editor</p>
                   <h1 className="forum-heading">Gallery Intake</h1>
                   <p className="forum-copy">
-                    Upload new images, rescan the library, and edit titles, dates, ordering, and visibility without leaving the
+                    Upload new media, rescan the library, and edit titles, dates, ordering, and visibility without leaving the
                     archive tool.
                   </p>
                 </div>
@@ -175,12 +175,12 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
                   <label className="forum-button cursor-pointer">
                     <ImagePlus className="h-4 w-4" />
                     <span className="flex flex-col items-start leading-tight">
-                      <span className="forum-button-label">Upload Images</span>
-                      <span className="forum-button-note">Add JPG, PNG, HEIC, or HEIF</span>
+                      <span className="forum-button-label">Upload Media</span>
+                      <span className="forum-button-note">Add images or video files</span>
                     </span>
                     <input
                       type="file"
-                      accept=".jpg,.jpeg,.png,.heic,.heif"
+                      accept=".jpg,.jpeg,.png,.heic,.heif,.mp4,.mov,.m4v,.webm,.mkv,.avi,.mpeg,.mpg,.3gp,.ogv"
                       multiple
                       className="hidden"
                       onChange={(event) => void handleUpload(event.target.files)}
@@ -204,7 +204,7 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
 
               <div className="forum-stat-grid">
                 <div className="forum-stat-card">
-                  <p className="forum-stat-label">Indexed Photos</p>
+                  <p className="forum-stat-label">Indexed Media</p>
                   <p className="forum-stat-value">{photos.length}</p>
                 </div>
                 <div className="forum-stat-card">
@@ -225,7 +225,7 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
             <div className="flex flex-wrap items-center gap-3 bg-[linear-gradient(180deg,var(--panel-strong)_0%,var(--panel-soft)_100%)] px-3 py-2 border-t border-l border-t-[var(--bp-border-light)] border-l-[var(--bp-border-light)] border-b border-r border-b-[var(--bp-border-darker)] border-r-[var(--bp-border-darker)] shadow-[inset_1px_1px_0_var(--bp-inset),inset_-1px_-1px_0_var(--bp-border-dark)]">
               {isBusy ? <LoaderCircle className="h-4 w-4 animate-spin text-[var(--accent-strong)]" /> : null}
               <span className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--text-soft)]">Session Status</span>
-              <span className="text-sm text-[var(--text-strong)]">{notice || `${photos.length} indexed photos available.`}</span>
+              <span className="text-sm text-[var(--text-strong)]">{notice || `${photos.length} indexed media items available.`}</span>
             </div>
           </div>
         </section>
@@ -249,7 +249,17 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
                 <div className="grid gap-4 xl:grid-cols-[240px_minmax(0,1fr)]">
                   <div className="space-y-3">
                     <div className="overflow-hidden border border-[var(--line-strong)] bg-[var(--panel-ink)] shadow-[inset_1px_1px_0_var(--bp-inset),inset_-1px_-1px_0_var(--bp-border-dark)]">
-                      <img src={photo.src} srcSet={photo.srcSet} sizes="240px" alt={photo.alt} className="aspect-[4/5] w-full object-cover" />
+                      {photo.mediaType === 'video' ? (
+                        <div className="relative aspect-[4/5] w-full bg-black">
+                          <video src={photo.src} poster={photo.placeholder} muted loop autoPlay playsInline preload="metadata" className="h-full w-full object-cover" />
+                          <span className="absolute left-2 top-2 inline-flex h-6 items-center gap-1 border border-white/90 bg-black/55 px-1.5 text-[10px] font-bold text-white/90">
+                            <Film className="h-3 w-3" />
+                            VID
+                          </span>
+                        </div>
+                      ) : (
+                        <img src={photo.src} srcSet={photo.srcSet} sizes="240px" alt={photo.alt} className="aspect-[4/5] w-full object-cover" />
+                      )}
                     </div>
 
                     <div className="forum-meta-box">
@@ -257,7 +267,7 @@ export function AdminPanel({ photos, onRefresh }: AdminPanelProps) {
                         <dt className="forum-meta-term">Captured</dt>
                         <dd className="forum-meta-desc">{formatDate(photo.capturedAt || photo.updatedAt) || 'Unknown'}</dd>
                         <dt className="forum-meta-term">Camera</dt>
-                        <dd className="forum-meta-desc">{photo.camera || 'Unknown'}</dd>
+                        <dd className="forum-meta-desc">{photo.mediaType === 'video' ? 'Video' : photo.camera || 'Unknown'}</dd>
                         <dt className="forum-meta-term">Lens</dt>
                         <dd className="forum-meta-desc">{photo.lens || 'Unknown'}</dd>
                       </dl>

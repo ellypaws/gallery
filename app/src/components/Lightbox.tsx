@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { gsap } from 'gsap'
-import { Aperture, Camera, ChevronLeft, ChevronRight, Clock3, ExternalLink, Search, Star, X } from 'lucide-react'
+import { Aperture, Camera, ChevronLeft, ChevronRight, Clock3, ExternalLink, Film, Search, Star, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-import type { GalleryItem } from '../lib/types'
+import type { GalleryItem, GallerySource } from '../lib/types'
 import { BarLoader } from './BarLoader.tsx'
 import { ZoomableImage } from './ZoomableImage'
 
@@ -53,7 +53,12 @@ export function Lightbox({
   const overlayRef = useRef<HTMLDivElement | null>(null)
   const frameRef = useRef<HTMLDivElement | null>(null)
   const photo = photos[activeIndex]
-  const assetURL = photo.originalSrc || photo.src
+  const isVideo = photo.mediaType === 'video'
+  const videoSources = isVideo ? photo.sources : []
+  const defaultVideoSrc = videoSources[videoSources.length - 1]?.src || photo.originalSrc || photo.src
+  const [selectedVideoSrcById, setSelectedVideoSrcById] = useState<Record<number, string>>({})
+  const selectedVideoSrc = selectedVideoSrcById[photo.id] || defaultVideoSrc
+  const assetURL = isVideo ? selectedVideoSrc || defaultVideoSrc : photo.originalSrc || photo.src
   const [loadedPhotoId, setLoadedPhotoId] = useState<number | null>(null)
   const [isDesktopWindow, setIsDesktopWindow] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth >= DESKTOP_BREAKPOINT : false,
@@ -211,9 +216,11 @@ export function Lightbox({
         { label: 'File', value: getPhotoLabel(photo) },
         { label: 'Date', value: formatDateTime(photo.capturedAt || photo.updatedAt) },
         { label: 'Dimensions', value: `${photo.width} x ${photo.height}` },
+        { label: 'Type', value: isVideo ? 'Video' : 'Image' },
+        { label: 'Duration', value: isVideo ? formatDuration(photo.duration) : '' },
         { label: 'Path', value: photo.relativePath },
       ].filter((row) => row.value),
-    [photo],
+    [isVideo, photo],
   )
 
   const metaRows = useMemo(() => {
@@ -310,16 +317,27 @@ export function Lightbox({
             ) : null}
 
             <div className="absolute inset-0">
-              <ZoomableImage
-                key={photo.id}
-                src={assetURL || photo.placeholder || photo.src}
-                alt={photo.alt}
-                naturalWidth={photo.width}
-                naturalHeight={photo.height}
-                onLoad={() => setLoadedPhotoId(photo.id)}
-                className={`transition-opacity duration-150 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
-                hideControls
-              />
+              {isVideo ? (
+                <VideoPlayer
+                  key={`${photo.id}-${assetURL}`}
+                  src={assetURL || photo.src}
+                  poster={photo.placeholder}
+                  title={photo.alt}
+                  onLoad={() => setLoadedPhotoId(photo.id)}
+                  className={`transition-opacity duration-150 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                />
+              ) : (
+                <ZoomableImage
+                  key={photo.id}
+                  src={assetURL || photo.placeholder || photo.src}
+                  alt={photo.alt}
+                  naturalWidth={photo.width}
+                  naturalHeight={photo.height}
+                  onLoad={() => setLoadedPhotoId(photo.id)}
+                  className={`transition-opacity duration-150 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                  hideControls
+                />
+              )}
             </div>
 
             <button
@@ -341,6 +359,12 @@ export function Lightbox({
               <Star className={`h-3.5 w-3.5 ${photo.starred ? 'fill-current' : ''}`} />
               <span className="forum-button-label">{formatCount(photo.starCount)}</span>
             </button>
+
+            {isVideo && videoSources.length > 1 ? (
+              <div className="absolute left-2 top-2 z-20">
+                <QualityPicker sources={videoSources} value={assetURL} onChange={(src) => setSelectedVideoSrcById((current) => ({ ...current, [photo.id]: src }))} />
+              </div>
+            ) : null}
 
           </div>
 
@@ -412,8 +436,8 @@ export function Lightbox({
             onPointerDown={beginWindowMove}
           >
             <div className="flex min-w-0 items-center gap-2">
-              <span className="forum-window-badge">IMG</span>
-              <span className="truncate text-[12px] font-bold">Image Viewer - {getPhotoLabel(photo)}</span>
+              <span className="forum-window-badge">{isVideo ? 'VID' : 'IMG'}</span>
+              <span className="truncate text-[12px] font-bold">{isVideo ? 'Video' : 'Image'} Viewer - {getPhotoLabel(photo)}</span>
             </div>
             <button
               type="button"
@@ -469,6 +493,10 @@ export function Lightbox({
               <span className="forum-button-label">{formatCount(photo.starCount)}</span>
             </button>
 
+            {isVideo && videoSources.length > 1 ? (
+              <QualityPicker sources={videoSources} value={assetURL} onChange={(src) => setSelectedVideoSrcById((current) => ({ ...current, [photo.id]: src }))} />
+            ) : null}
+
             {photo.originalSrc ? (
               <a
                 href={photo.originalSrc}
@@ -506,15 +534,26 @@ export function Lightbox({
                     </div>
                   ) : null}
 
-                  <ZoomableImage
-                    key={photo.id}
-                    src={assetURL || photo.placeholder || photo.src}
-                    alt={photo.alt}
-                    naturalWidth={photo.width}
-                    naturalHeight={photo.height}
-                    onLoad={() => setLoadedPhotoId(photo.id)}
-                    className={`transition-opacity duration-150 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
-                  />
+                  {isVideo ? (
+                    <VideoPlayer
+                      key={`${photo.id}-${assetURL}`}
+                      src={assetURL || photo.src}
+                      poster={photo.placeholder}
+                      title={photo.alt}
+                      onLoad={() => setLoadedPhotoId(photo.id)}
+                      className={`transition-opacity duration-150 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                    />
+                  ) : (
+                    <ZoomableImage
+                      key={photo.id}
+                      src={assetURL || photo.placeholder || photo.src}
+                      alt={photo.alt}
+                      naturalWidth={photo.width}
+                      naturalHeight={photo.height}
+                      onLoad={() => setLoadedPhotoId(photo.id)}
+                      className={`transition-opacity duration-150 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                    />
+                  )}
                 </div>
               </div>
             </section>
@@ -676,6 +715,64 @@ function MetaIcon({ row }: { row: MetaRow }) {
   return <Icon className="mt-[1px] h-4 w-4 shrink-0 text-[var(--viewer-ink)]" />
 }
 
+function QualityPicker({
+  sources,
+  value,
+  onChange,
+}: {
+  sources: GallerySource[]
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <label className="forum-button !min-h-[28px] !gap-1">
+      <Film className="h-3.5 w-3.5" />
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="bg-transparent text-[11px] font-bold outline-none"
+        aria-label="Video quality"
+      >
+        {sources.map((source) => (
+          <option key={source.src} value={source.src}>
+            {source.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+function VideoPlayer({
+  src,
+  poster,
+  title,
+  onLoad,
+  className,
+}: {
+  src: string
+  poster: string
+  title: string
+  onLoad: () => void
+  className?: string
+}) {
+  return (
+    <video
+      src={src}
+      poster={poster}
+      title={title}
+      autoPlay
+      controls
+      loop
+      muted
+      playsInline
+      preload="metadata"
+      onLoadedData={onLoad}
+      className={`h-full w-full bg-black object-contain ${className ?? ''}`}
+    />
+  )
+}
+
 function formatMetaValue(row: MetaRow) {
   if (row.key === 'aperture') {
     return `f/${row.value}`
@@ -685,6 +782,16 @@ function formatMetaValue(row: MetaRow) {
 
 function formatCount(value: number) {
   return new Intl.NumberFormat(undefined, { notation: value >= 10000 ? 'compact' : 'standard' }).format(value)
+}
+
+function formatDuration(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return ''
+  }
+  const total = Math.round(seconds)
+  const minutes = Math.floor(total / 60)
+  const remainingSeconds = total % 60
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
 }
 
 const RESIZE_HANDLES: { direction: ResizeDirection; className: string }[] = [

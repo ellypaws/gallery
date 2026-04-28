@@ -1,14 +1,17 @@
 export type GalleryItem = {
   id: number
+  mediaType: 'image' | 'video'
   title: string
   alt: string
   description: string
   width: number
   height: number
+  duration: number
   src: string
   originalSrc: string
   placeholder: string
   srcSet: string
+  sources: GallerySource[]
   sizes: string
   camera: string
   lens: string
@@ -28,6 +31,16 @@ export type GalleryItem = {
   clickCount: number
   starCount: number
   starred: boolean
+}
+
+export type GallerySource = {
+  label: string
+  src: string
+  width: number
+  height: number
+  mimeType: string
+  bitrate: number
+  duration: number
 }
 
 export type GalleryResponse = {

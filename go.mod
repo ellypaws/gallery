@@ -11,6 +11,11 @@ require (
 	github.com/dsoprea/go-jpeg-image-structure/v2 v2.0.0-20221012074422-4f3f7e934102
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gen2brain/heic v0.4.9
+	github.com/go-ffstatic/darwin-amd64 v0.0.0-20220419131334-e9c56ca62063
+	github.com/go-ffstatic/darwin-arm64 v0.0.0-20220419131334-d11d20c3a9ed
+	github.com/go-ffstatic/linux-amd64 v0.0.0-20220419131335-2c4ec98944bd
+	github.com/go-ffstatic/linux-arm64 v0.0.0-20220419131336-cf233ef59cc7
+	github.com/go-ffstatic/windows-amd64 v0.0.0-20220419131337-d9ddf00f0f90
 	github.com/joho/godotenv v1.5.1
 	github.com/labstack/echo/v4 v4.15.1
 	github.com/u2takey/ffmpeg-go v0.5.0

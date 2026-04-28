@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"os/exec"
@@ -285,10 +286,10 @@ func resolveBinary(envKey, name string) string {
 		return local
 	}
 	path, err := exec.LookPath(name)
-	if err != nil {
-		return ""
+	if err == nil {
+		return path
 	}
-	return path
+	return normalizeExecutablePath(ffstaticBinary(name))
 }
 
 func localBinary(name string) string {
@@ -302,6 +303,36 @@ func localBinary(name string) string {
 		}
 	}
 	return ""
+}
+
+func normalizeExecutablePath(path string) string {
+	if path == "" || runtime.GOOS != "windows" || strings.EqualFold(filepath.Ext(path), ".exe") {
+		return path
+	}
+
+	exePath := path + ".exe"
+	if stat, err := os.Stat(exePath); err == nil && !stat.IsDir() {
+		return exePath
+	}
+
+	src, err := os.Open(path)
+	if err != nil {
+		return path
+	}
+	defer src.Close()
+
+	dst, err := os.OpenFile(exePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
+	if err != nil {
+		return path
+	}
+	_, copyErr := io.Copy(dst, src)
+	closeErr := dst.Close()
+	if copyErr != nil || closeErr != nil {
+		_ = os.Remove(exePath)
+		return path
+	}
+
+	return exePath
 }
 
 func runtimeBinaryName(name string) string {

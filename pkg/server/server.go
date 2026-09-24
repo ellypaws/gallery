@@ -72,6 +72,7 @@ func New(cfg config.Config, logger *log.Logger, mediaService *media.Service) *Ap
 	e.GET("/admin/*", serveSPA(), adminAuth)
 	e.GET("/media/originals/*", serveMedia(cfg.MediaDir, logger))
 	e.GET("/media/cache/*", serveMedia(cfg.CacheDir, logger))
+	e.GET("/media/crayon/*", serveMedia(cfg.CrayonDir, logger))
 	e.GET("/*", serveSPA())
 
 	return &App{cfg: cfg, echo: e, logger: logger}

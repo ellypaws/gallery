@@ -50,6 +50,7 @@ type GalleryItem struct {
 	Src             string     `json:"src"`
 	OriginalSrc     string     `json:"originalSrc"`
 	Placeholder     string     `json:"placeholder"`
+	CrayonSrc       string     `json:"crayonSrc"`
 	SrcSet          string     `json:"srcSet"`
 	Sources         []Source   `json:"sources"`
 	Sizes           string     `json:"sizes"`
@@ -842,6 +843,7 @@ func (s *Service) toGalleryItem(photo models.Photo) GalleryItem {
 		Src:             s.cfg.CacheURL(display.RelativePath),
 		OriginalSrc:     s.originalURL(photo, mediaType),
 		Placeholder:     s.cfg.CacheURL(placeholder.RelativePath),
+		CrayonSrc:       s.crayonURL(photo.RelativePath),
 		SrcSet:          buildSrcSet(s.cfg, photo.Derivatives, mediaType),
 		Sources:         buildSources(s.cfg, photo, photo.Derivatives),
 		Sizes:           "(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw",
@@ -860,6 +862,19 @@ func (s *Service) toGalleryItem(photo models.Photo) GalleryItem {
 		Hidden:          photo.Override.Hidden,
 		RelativePath:    photo.RelativePath,
 	}
+}
+
+// crayonURL finds the drawn thumbnail named after the media file, e.g. DSCF4915.jpg -> DSCF4915.webp.
+func (s *Service) crayonURL(relativePath string) string {
+	if relativePath == "" {
+		return ""
+	}
+	rel := strings.TrimSuffix(relativePath, filepath.Ext(relativePath)) + ".webp"
+	info, err := os.Stat(filepath.Join(s.cfg.CrayonDir, filepath.FromSlash(rel)))
+	if err != nil {
+		return ""
+	}
+	return s.cfg.CrayonURL(rel, info.ModTime().Unix())
 }
 
 func (s *Service) originalURL(photo models.Photo, mediaType string) string {

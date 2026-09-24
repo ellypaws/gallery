@@ -26,3 +26,7 @@ photos
 # database files
 sqlite.db
 *.db
+
+# crayon theme art
+!app/public/favicon.png
+!app/src/assets/crayon/*.webp

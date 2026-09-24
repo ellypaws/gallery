@@ -1,5 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Teko:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Mali:wght@500;600;700&family=Teko:wght@500;600;700&display=swap');
 @import "tailwindcss";
+@import "./crayon.css";
 
 :root {
   color-scheme: light;
@@ -39,46 +40,9 @@
   --bp-border-darker: #404040;
 }
 
-:root[data-theme='dark'] {
-  color-scheme: dark;
-  --bg: #1f232a;
-  --bg-alt: #171a20;
-  --panel: #2c3139;
-  --panel-soft: #252930;
-  --panel-strong: #383d46;
-  --panel-ink: #15181d;
-  --text: #d6d8dc;
-  --text-soft: #9ea3aa;
-  --text-strong: #f0f2f5;
-  --line: #575b63;
-  --line-strong: #050607;
-  --bevel-light: #5e646d;
-  --bevel-dark: #111317;
-  --accent: #4b6f9f;
-  --accent-strong: #6d95c9;
-  --accent-soft: rgba(109, 149, 201, 0.14);
-  --window-bar: linear-gradient(180deg, #425977 0%, #27466f 45%, #3a5b84 100%);
-  --button-fill: linear-gradient(180deg, #4a5059 0%, #292d34 100%);
-  --button-fill-hover: linear-gradient(180deg, #59616d 0%, #343941 100%);
-  --button-fill-active: linear-gradient(180deg, #23272d 0%, #515863 100%);
-  --field-fill: #15181d;
-  --shadow: 0 14px 30px rgba(0, 0, 0, 0.34);
-  --shadow-tight: 0 6px 14px rgba(0, 0, 0, 0.3);
-  --page-grid: rgba(255, 255, 255, 0.05);
-  --viewer-bg: rgba(15, 17, 21, 0.9);
-  --viewer-panel: #2c3139;
-  --viewer-line: #050607;
-  --viewer-ink: #f0f2f5;
-  --viewer-track: rgba(255, 255, 255, 0.16);
-  --asset-icon-filter: brightness(0) invert(1);
-  --bp-inset: #5e646d;
-  --bp-border-light: #555555;
-  --bp-border-dark: #111111;
-  --bp-border-darker: #000000;
-}
-
 @theme {
   --font-teko: "Teko", sans-serif;
+  --font-hand: "Mali", "Comic Sans MS", cursive;
 }
 
 html,
@@ -428,22 +392,6 @@ code {
   .star-marker-active {
     background: linear-gradient(180deg, #fff4a8 0%, #d5b642 100%);
     color: #000000;
-  }
-
-  .masonry-tilt-card {
-    position: relative;
-    overflow: hidden;
-    transform: var(--tilt-transform);
-    transform-style: preserve-3d;
-    will-change: transform;
-    transition: transform 0.16s ease, box-shadow 0.16s ease;
-  }
-
-  .masonry-tilt-card:hover {
-    box-shadow:
-      0 10px 20px rgba(0, 0, 0, 0.16),
-      inset 1px 1px 0 var(--bp-inset),
-      inset -1px -1px 0 var(--bp-border-dark);
   }
 
   .forum-button-label {

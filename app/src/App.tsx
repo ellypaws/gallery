@@ -1,25 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { gsap } from 'gsap'
-import { Calendar, Grid, LayoutDashboard, MoonStar, Sparkles, SunMedium } from 'lucide-react'
 
 import { AdminPanel } from './components/AdminPanel'
+import { CrayonMargins } from './components/CrayonMargins'
+import { CrayonScrollArea } from './components/CrayonScrollArea'
 import { Lightbox } from './components/Lightbox'
 import { MasonryGallery } from './components/MasonryGallery'
 import { BarLoader } from './components/BarLoader.tsx'
-import { useTheme } from './hooks/useTheme'
+import { crayonArt } from './lib/crayonArt'
 import { fetchAdminGallery, fetchGallery, togglePhotoStar, trackPhotoClick, trackPhotoViews } from './lib/api'
 import type { GalleryInteraction, GalleryItem } from './lib/types'
 
 const MASONRY_STORAGE_KEY = 'gallery-masonry'
 const GROUPED_STORAGE_KEY = 'gallery-grouped'
 const HOVER_TILT_STORAGE_KEY = 'gallery-hover-tilt'
+const PENCIL_STORAGE_KEY = 'gallery-pencil'
 const VIEWED_STORAGE_KEY = 'gallery-viewed-photos'
 const CLICKED_STORAGE_KEY = 'gallery-clicked-photos'
 const STARRED_STORAGE_KEY = 'gallery-starred-photos'
 const VIEW_BATCH_DEBOUNCE_MS = 450
+const HEADING_HEIGHT = 70
 
 function App() {
-  const { theme, toggleTheme } = useTheme()
   const shellRef = useRef<HTMLDivElement | null>(null)
   const viewedPhotoIdsRef = useRef<Set<number>>(readStoredNumberSet(VIEWED_STORAGE_KEY))
   const clickedPhotoIdsRef = useRef<Set<number>>(readStoredNumberSet(CLICKED_STORAGE_KEY))
@@ -35,6 +37,7 @@ function App() {
   const [isMasonry, setIsMasonry] = useState(() => getStoredViewFlag(MASONRY_STORAGE_KEY, true))
   const [isGrouped, setIsGrouped] = useState(() => getStoredViewFlag(GROUPED_STORAGE_KEY, false))
   const [isHoverTilt, setIsHoverTilt] = useState(() => getStoredViewFlag(HOVER_TILT_STORAGE_KEY, false))
+  const [isPencil, setIsPencil] = useState(() => getStoredViewFlag(PENCIL_STORAGE_KEY, true))
   const [lightboxWindows, setLightboxWindows] = useState<LightboxWindowState[]>([])
   const [lastCustomDesktopRect, setLastCustomDesktopRect] = useState<DesktopLightboxRect | null>(null)
 
@@ -101,6 +104,10 @@ function App() {
   }, [isHoverTilt])
 
   useEffect(() => {
+    window.localStorage.setItem(PENCIL_STORAGE_KEY, String(isPencil))
+  }, [isPencil])
+
+  useEffect(() => {
     if (!shellRef.current || isAdmin) {
       return
     }
@@ -124,15 +131,6 @@ function App() {
       }
     }
   }, [])
-
-  function animateThemeToggle() {
-    gsap.fromTo(
-      '.theme-switch',
-      { scale: 0.96, y: 1 },
-      { scale: 1, y: 0, duration: 0.2, ease: 'power2.out' },
-    )
-    toggleTheme()
-  }
 
   function animateGroupToggle() {
     gsap.fromTo(
@@ -159,6 +157,15 @@ function App() {
       { scale: 1, y: 0, duration: 0.2, ease: 'power2.out' },
     )
     setIsHoverTilt((value) => !value)
+  }
+
+  function animatePencilToggle() {
+    gsap.fromTo(
+      '.pencil-switch',
+      { scale: 0.96, y: 1 },
+      { scale: 1, y: 0, duration: 0.2, ease: 'power2.out' },
+    )
+    setIsPencil((value) => !value)
   }
 
   function schedulePhotoView(photoID: number) {
@@ -439,104 +446,106 @@ function App() {
   const shouldDimBackground = lightboxWindows.length > 0 && !lightboxWindows.some((windowItem) => windowItem.isCustomSized)
   const canCloseFromBackdrop = lightboxWindows.length === 1 && shouldDimBackground
   const sortedWindows = [...lightboxWindows].sort((a, b) => a.zIndex - b.zIndex)
+  const heading = (
+    <div className="crayon-heading">
+      <h1>
+        <img src={crayonArt('elly')} alt="Elly" className="crayon-heading-name" />
+      </h1>
+      <img src={crayonArt('heart-name')} alt="" className="crayon-heading-heart" />
+      <img src={crayonArt('rainbow')} alt="" className="crayon-heading-rainbow" />
+    </div>
+  )
 
   return (
-    <div ref={shellRef} className="forum-app-shell">
-      <div className="forum-page">
-        <section className="forum-window forum-main-window forum-animate-in">
-          <div className="forum-window-bar forum-window-bar-primary">
+    <div ref={shellRef} className="crayon forum-app-shell">
+      <CrayonMargins />
+      <div className="forum-page crayon-page">
+        <section className="crayon-window crayon-frame forum-animate-in">
+          <div className="crayon-titlebar">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="forum-window-badge">🐕‍🦺</span>
-              <span className="truncate text-[12px] font-bold">Gallery - {summary.photoCount} items</span>
+              <img src={crayonArt('button-heart')} alt="" className="crayon-titlebar-badge" />
+              <span className="crayon-titlebar-text truncate">Gallery - {summary.photoCount} items</span>
             </div>
-            <div className="forum-window-actions">
+            <div className="crayon-titlebar-actions">
               <button
                 type="button"
                 onClick={animateLayoutToggle}
-                className="forum-icon-button layout-switch"
-                aria-label={isMasonry ? 'Switch to aligned layout' : 'Switch to masonry layout'}
+                className="crayon-titlebar-button layout-switch"
+                aria-label="Masonry layout"
                 aria-pressed={isMasonry}
+                title="Masonry layout"
               >
-                {isMasonry ? <LayoutDashboard className="h-3.5 w-3.5" /> : <Grid className="h-3.5 w-3.5" />}
-              </button>
-              <button
-                type="button"
-                onClick={animateGroupToggle}
-                className="forum-icon-button group-switch"
-                aria-label={isGrouped ? 'Disable grouping' : 'Enable grouping'}
-                aria-pressed={isGrouped}
-              >
-                <Calendar className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={animateThemeToggle}
-                className="forum-icon-button theme-switch"
-                aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                aria-pressed={theme === 'dark'}
-              >
-                {theme === 'dark' ? <SunMedium className="h-3.5 w-3.5" /> : <MoonStar className="h-3.5 w-3.5" />}
+                <img src={crayonArt('button-square')} alt="" />
               </button>
               <button
                 type="button"
                 onClick={animateHoverTiltToggle}
-                className="forum-icon-button tilt-switch"
-                aria-label={isHoverTilt ? 'Disable hover tilt' : 'Enable hover tilt'}
+                className="crayon-titlebar-button tilt-switch"
+                aria-label="Hover tilt"
                 aria-pressed={isHoverTilt}
+                title="Hover tilt"
               >
-                <Sparkles className="h-3.5 w-3.5" />
+                <img src={crayonArt('button-star')} alt="" />
+              </button>
+              <button
+                type="button"
+                onClick={animateGroupToggle}
+                className="crayon-titlebar-button group-switch"
+                aria-label="Group by date"
+                aria-pressed={isGrouped}
+                title="Group by date"
+              >
+                <img src={crayonArt('button-smile')} alt="" />
+              </button>
+              <button
+                type="button"
+                onClick={animatePencilToggle}
+                className="crayon-titlebar-button pencil-switch"
+                aria-label="Crayon filter"
+                aria-pressed={isPencil}
+                title="Crayon filter"
+              >
+                <img src={crayonArt('button-crayon')} alt="" />
               </button>
             </div>
           </div>
 
-          <div className="forum-toolbar-strip">
-            <div className="min-w-0 pr-2">
-              <h1 className="forum-heading forum-heading-compact -rotate-2 tracking-tight pointer-events-none relative text-[90px] z-20 -mb-[90px] antialiased drop-shadow-sm shrink-0">Elly</h1>
-            </div>
-
-            <div className="forum-toolbar-meta">
-              <span>{summary.photoCount} items</span>
-              {isGrouped ? (
-                <>
-                  <span className="forum-toolbar-separator" />
-                  <span>{summary.groupCount} groups</span>
-                </>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="forum-content-frame">
+          <div className="crayon-content crayon-frame">
             {isFetching ? (
-              <div className="forum-empty-state flex min-h-[320px] items-center justify-center">
+              <div className="forum-empty-state flex h-full items-center justify-center">
                 <BarLoader label="Loading" />
               </div>
             ) : photos.length === 0 ? (
               <div className="forum-empty-state">
-                <p className="m-0 text-sm font-bold text-[var(--text-strong)]">No photos available</p>
+                <p className="m-0">No photos yet</p>
               </div>
             ) : (
-              <div
-                className="forum-scrollbar flex h-full flex-col gap-5 overflow-y-auto p-2 md:p-3"
-              >
-                {groupedPhotos.map((group, index) => (
-                  <section key={group.label || `group-${index}`} className="flex flex-col gap-2">
-                    {group.label ? (
-                      <div className="forum-group-heading">
-                        <span>{group.label}</span>
-                        <span>{group.items.length}</span>
-                      </div>
-                    ) : null}
+              <CrayonScrollArea>
+                <div className="flex flex-col gap-5">
+                  {isGrouped ? <div style={{ height: `${HEADING_HEIGHT}px` }}>{heading}</div> : null}
+                  {groupedPhotos.map((group, index) => (
+                    <section key={group.label || `group-${index}`} className="flex flex-col gap-2">
+                      {group.label ? (
+                        <div className="forum-group-heading">
+                          <span>{group.label}</span>
+                          <span>{group.items.length}</span>
+                        </div>
+                      ) : null}
 
-                    <MasonryGallery
-                      items={group.items}
-                      onOpen={openPhotoWindow}
-                      onView={schedulePhotoView}
-                      enableHoverTilt={isHoverTilt}
-                      isMasonry={isMasonry}
-                    />
-                  </section>
-                ))}
-              </div>
+                      <MasonryGallery
+                        items={group.items}
+                        onOpen={openPhotoWindow}
+                        onView={schedulePhotoView}
+                        enableHoverTilt={isHoverTilt}
+                        enablePencil={isPencil}
+                        isMasonry={isMasonry}
+                        lead={!isGrouped && index === 0 ? heading : undefined}
+                        leadHeight={HEADING_HEIGHT}
+                      />
+                    </section>
+                  ))}
+                </div>
+              </CrayonScrollArea>
             )}
           </div>
         </section>

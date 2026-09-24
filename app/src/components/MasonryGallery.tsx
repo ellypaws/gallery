@@ -1,10 +1,11 @@
-import { type CSSProperties, type PointerEvent, useCallback, useEffect, useLayoutEffect, useRef, useMemo, useState } from 'react'
+import { type CSSProperties, type PointerEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useMemo, useState } from 'react'
 import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual'
-import { Star } from 'lucide-react'
 
+import { crayonArt, type CSSVars } from '../lib/crayonArt'
 import type { GalleryItem } from '../lib/types'
+import { PencilPhoto } from './PencilPhoto'
 
-const CARD_CAPTION_HEIGHT = 50
+const CARD_CHROME_HEIGHT = 78
 const MASONRY_LANDSCAPE_RATIOS = [0.666, 0.75, 0.875]
 const MASONRY_SQUARE_RATIOS = [1]
 
@@ -14,7 +15,10 @@ type MasonryGalleryProps = {
   onOpen: (index: number) => void
   onView: (photoID: number) => void
   enableHoverTilt: boolean
+  enablePencil: boolean
   isMasonry?: boolean
+  lead?: ReactNode
+  leadHeight?: number
 }
 
 type MasonryEntry = {
@@ -29,9 +33,10 @@ type MasonryColumn = {
   key: string
   items: MasonryEntry[]
   height: number
+  offset: number
 }
 
-export function MasonryGallery({ photos, items, onOpen, onView, enableHoverTilt, isMasonry }: MasonryGalleryProps) {
+export function MasonryGallery({ photos, items, onOpen, onView, enableHoverTilt, enablePencil, isMasonry, lead, leadHeight = 0 }: MasonryGalleryProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [width, setWidth] = useState(0)
   const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null)
@@ -55,7 +60,7 @@ export function MasonryGallery({ photos, items, onOpen, onView, enableHoverTilt,
 
   const columns = useMemo(() => {
     const gap = width >= 960 ? 14 : 10
-    const minColumnWidth = isMasonry ? 420 : 560
+    const minColumnWidth = isMasonry ? 360 : 500
     const maxColumns = isMasonry ? 5 : 4
     const count =
       width > 0
@@ -64,10 +69,12 @@ export function MasonryGallery({ photos, items, onOpen, onView, enableHoverTilt,
           ? 3
           : 2
     const columnWidth = width > 0 ? Math.max(minColumnWidth, Math.floor((width - gap * (count - 1)) / count)) : minColumnWidth
+    const offset = lead && count > 1 ? leadHeight : 0
     const next = Array.from({ length: count }, (_, index) => ({
       key: `column-${index}`,
       items: [] as MasonryEntry[],
-      height: 0,
+      height: index === 0 ? offset : 0,
+      offset: index === 0 ? offset : 0,
     }))
 
     const dataSource = items || (photos ? photos.map((photo, index) => ({ photo, globalIndex: index })) : [])
@@ -82,7 +89,7 @@ export function MasonryGallery({ photos, items, onOpen, onView, enableHoverTilt,
       }
 
       const imageHeight = Math.max(180, Math.round(columnWidth * calcRatio))
-      const estimatedHeight = imageHeight + CARD_CAPTION_HEIGHT
+      const estimatedHeight = imageHeight + CARD_CHROME_HEIGHT
       const target = next.reduce((best, column) => (column.height < best.height ? column : best), next[0])
 
       target.items.push({
@@ -103,10 +110,13 @@ export function MasonryGallery({ photos, items, onOpen, onView, enableHoverTilt,
         height: Math.max(0, column.height - gap),
       })),
     }
-  }, [isMasonry, items, photos, width])
+  }, [isMasonry, items, lead, leadHeight, photos, width])
+
+  const isLeadInColumn = columns.columns[0]?.offset > 0
 
   return (
     <div ref={containerRef} className="w-full">
+      {lead && !isLeadInColumn ? <div style={{ height: `${leadHeight}px` }}>{lead}</div> : null}
       <div
         className="grid items-start"
         style={{
@@ -124,6 +134,8 @@ export function MasonryGallery({ photos, items, onOpen, onView, enableHoverTilt,
             onOpen={onOpen}
             onView={onView}
             enableHoverTilt={enableHoverTilt}
+            enablePencil={enablePencil}
+            lead={column.offset > 0 ? lead : null}
           />
         ))}
       </div>
@@ -139,6 +151,8 @@ function VirtualColumn({
   onOpen,
   onView,
   enableHoverTilt,
+  enablePencil,
+  lead,
 }: {
   column: MasonryColumn
   gap: number
@@ -147,6 +161,8 @@ function VirtualColumn({
   onOpen: (index: number) => void
   onView: (photoID: number) => void
   enableHoverTilt: boolean
+  enablePencil: boolean
+  lead: ReactNode
 }) {
   const [parentElement, setParentElement] = useState<HTMLDivElement | null>(null)
   const [scrollMargin, setScrollMargin] = useState(0)
@@ -184,8 +200,9 @@ function VirtualColumn({
   }, [column.items.length, scrollMargin, virtualizer])
 
   return (
-    <div ref={setParentElement} className="relative">
-      <div style={{ height: `${column.height}px`, position: 'relative' }}>
+    <div>
+      {column.offset > 0 ? <div style={{ height: `${column.offset}px` }}>{lead}</div> : null}
+      <div ref={setParentElement} className="relative" style={{ height: `${column.height - column.offset}px` }}>
         {items.map((virtualItem) => {
           const entry = column.items[virtualItem.index]
           if (!entry) {
@@ -203,6 +220,7 @@ function VirtualColumn({
               onOpen={onOpen}
               onView={onView}
               enableHoverTilt={enableHoverTilt}
+              enablePencil={enablePencil}
               scrollElement={scrollElement}
               measureElement={virtualizer.measureElement}
             />
@@ -222,6 +240,7 @@ function GalleryCard({
   onOpen,
   onView,
   enableHoverTilt,
+  enablePencil,
   scrollElement,
   measureElement,
 }: {
@@ -233,6 +252,7 @@ function GalleryCard({
   onOpen: (index: number) => void
   onView: (photoID: number) => void
   enableHoverTilt: boolean
+  enablePencil: boolean
   scrollElement: HTMLElement | null
   measureElement: (node: Element | null) => void
 }) {
@@ -241,6 +261,14 @@ function GalleryCard({
   const coverSlotWidth = getCoverSlotWidth(columnWidth, entry.imageHeight, entry.photo.width, entry.photo.height)
   const title = getPhotoLabel(entry.photo)
   const stamp = formatShortDate(entry.photo.capturedAt || entry.photo.updatedAt) || 'Undated'
+  const decor = getCardDecor(entry.photo.id)
+  const cardStyle: CSSVars = {
+    '--tilt-transform': RESTING_TILT,
+    '--frame-color': decor.color,
+    '--frame-shift': `${-decor.shift}px`,
+    '--paper-x': `${-decor.shift}px`,
+    '--paper-y': `${-(decor.shift * 3) % 768}px`,
+  }
   const setMeasuredElement = useCallback(
     (node: HTMLDivElement | null) => {
       measureElement(node)
@@ -296,7 +324,7 @@ function GalleryCard({
       return
     }
 
-    element.style.setProperty('--tilt-transform', 'perspective(900px) rotateX(0deg) rotateY(0deg) scale(1)')
+    element.style.setProperty('--tilt-transform', RESTING_TILT)
   }
 
   return (
@@ -311,66 +339,101 @@ function GalleryCard({
     >
       <div
         ref={tiltCardRef}
-        className={`bp-panel group w-full p-1 ${enableHoverTilt ? 'masonry-tilt-card' : ''}`}
+        className="crayon-card crayon-frame group w-full"
         role="button"
         tabIndex={0}
-        style={TILT_CARD_STYLE}
+        style={cardStyle}
         onPointerMove={handleTiltPointerMove}
         onPointerLeave={handleTiltPointerLeave}
         onClick={() => onOpen(entry.index)}
         onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onOpen(entry.index) }}
       >
-        <div
-          className="bp-inset relative w-full shrink-0 overflow-hidden"
-          style={{ aspectRatio: entry.aspectRatio }}
-        >
-          {entry.photo.mediaType === 'video' ? (
-            <video
-              src={entry.photo.src}
-              poster={entry.photo.placeholder}
-              muted
-              loop
-              autoPlay
-              playsInline
-              preload="metadata"
-              className="block h-full w-full object-cover transition-opacity duration-200 group-hover:opacity-90"
-            />
-          ) : (
-            <img
-              src={entry.photo.src}
-              srcSet={entry.photo.srcSet}
-              sizes={coverSlotWidth > 0 ? `${coverSlotWidth}px` : entry.photo.sizes}
-              alt={entry.photo.alt}
-              loading="lazy"
-              decoding="async"
-              className="block h-full w-full object-cover transition-opacity duration-200 group-hover:opacity-90"
-            />
-          )}
+        <div className="crayon-card-photo crayon-frame w-full shrink-0" style={{ aspectRatio: entry.aspectRatio }}>
+          <PencilPhoto
+            key={entry.photo.src}
+            photo={entry.photo}
+            sizes={coverSlotWidth > 0 ? `${coverSlotWidth}px` : entry.photo.sizes}
+            enabled={enablePencil}
+          />
         </div>
 
-        <div className="flex flex-col justify-between px-1 pb-1 pt-2">
-          <div className="mb-1 flex min-w-0 items-center justify-between gap-2">
-            <p className="m-0 min-w-0 truncate text-[11px] font-bold text-[var(--text-strong)]" title={title}>{title}</p>
-            {entry.photo.starCount > 0 ? (
-              <span className={`inline-flex shrink-0 items-center gap-1 text-[10px] font-bold ${entry.photo.starred ? 'text-[var(--text-strong)]' : 'text-[var(--text-soft)]'}`}>
-                <Star className={`h-3 w-3 ${entry.photo.starred ? 'fill-current' : ''}`} />
-                <span>{formatCount(entry.photo.starCount)}</span>
-              </span>
-            ) : null}
-          </div>
-          <div className="flex items-center justify-between gap-2 text-[10px] text-[var(--text-soft)]">
-            <span>{stamp}</span>
-            <span>{entry.photo.width}×{entry.photo.height}</span>
+        <div className="crayon-caption">
+          <img src={crayonArt(decor.camera)} alt="" className="crayon-caption-icon" />
+          <div className="min-w-0 flex-1">
+            <p className="crayon-caption-title truncate" title={title}>{title}</p>
+            <div className="crayon-caption-meta">
+              <span>{stamp}</span>
+              <span>{entry.photo.width}×{entry.photo.height}</span>
+              {entry.photo.starCount > 0 ? (
+                <span className="crayon-caption-stars" aria-label={`${formatCount(entry.photo.starCount)} stars`}>
+                  <img src={crayonArt('star-yellow')} alt="" style={entry.photo.starred ? undefined : UNSTARRED_STYLE} />
+                  <span>{formatCount(entry.photo.starCount)}</span>
+                </span>
+              ) : null}
+            </div>
           </div>
         </div>
+
+        <img src={crayonArt(decor.doodle)} alt="" className="crayon-caption-doodle" />
+        {decor.stickers.map((sticker) => (
+          <img key={sticker.art} src={crayonArt(sticker.art)} alt="" className="crayon-sticker" style={sticker.style} />
+        ))}
       </div>
     </div>
   )
 }
 
-const TILT_CARD_STYLE = {
-  '--tilt-transform': 'perspective(900px) rotateX(0deg) rotateY(0deg) scale(1)',
-} as CSSProperties
+const FRAME_COLORS = [
+  { color: 'var(--crayon-pink)', camera: 'camera-pink' },
+  { color: 'var(--crayon-blue)', camera: 'camera-blue' },
+  { color: 'var(--crayon-purple)', camera: 'camera-purple' },
+  { color: 'var(--crayon-lilac)', camera: 'camera-lilac' },
+  { color: 'var(--crayon-yellow)', camera: 'camera-yellow' },
+  { color: 'var(--crayon-green)', camera: 'camera-green' },
+]
+
+const CAPTION_DOODLES = ['heart-small', 'smiley-green', 'star-yellow', 'flower-pink', 'paw-small', 'smiley-yellow', 'heart-blue', 'flower-blue']
+
+type Sticker = {
+  art: string
+  style: CSSVars
+}
+
+const STICKER_SETS: Sticker[][] = [
+  [
+    { art: 'bear-small-sticker', style: { right: '16px', bottom: '72px', width: '55px' } },
+    { art: 'heart-small-sticker', style: { left: '-13px', top: '58%', width: '28px', '--r': '-12deg' } },
+  ],
+  [{ art: 'flower-teal-sticker', style: { right: '-15px', top: '-15px', width: '48px' } }],
+  [{ art: 'tape-gingham', style: { left: '-22px', top: '-17px', width: '60px', '--r': '-6deg' } }],
+  [
+    { art: 'star-yellow-sticker', style: { left: '-13px', top: '-13px', width: '39px' } },
+    { art: 'heart-blue-sticker', style: { right: '-9px', top: '-9px', width: '30px', '--r': '12deg' } },
+    { art: 'flower-blue-sticker', style: { left: '-11px', bottom: '52px', width: '32px' } },
+  ],
+  [],
+  [{ art: 'tape-purple', style: { right: '-20px', bottom: '-15px', width: '64px', '--r': '4deg' } }],
+  [{ art: 'smiley-yellow-sticker', style: { right: '-13px', top: '-13px', width: '37px' } }],
+  [
+    { art: 'sparkle-small-yellow-sticker', style: { right: '18px', top: '18px', width: '26px' } },
+    { art: 'heart-small-sticker', style: { left: '-13px', top: '-13px', width: '30px', '--r': '-10deg' } },
+  ],
+]
+
+const UNSTARRED_STYLE: CSSProperties = { filter: 'grayscale(1)', opacity: 0.6 }
+
+function getCardDecor(photoID: number) {
+  const hash = Math.imul(photoID + 1, 2654435761) >>> 0
+  const frame = FRAME_COLORS[hash % FRAME_COLORS.length]
+  return {
+    ...frame,
+    doodle: CAPTION_DOODLES[(hash >>> 5) % CAPTION_DOODLES.length],
+    stickers: STICKER_SETS[(hash >>> 11) % STICKER_SETS.length],
+    shift: (hash >>> 17) % 340,
+  }
+}
+
+const RESTING_TILT = 'perspective(900px) rotateX(0deg) rotateY(0deg) scale(1)'
 
 function canUseHoverTilt() {
   return (

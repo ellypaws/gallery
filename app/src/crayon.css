@@ -1,0 +1,724 @@
+@layer components {
+  .crayon {
+    --paper: #f8efe1;
+    --ink: #5c4f47;
+    --ink-soft: #9b8b81;
+    --ink-strong: #3d332d;
+    --frame-mauve: #a8979e;
+    --crayon-pink: #e889ae;
+    --crayon-blue: #3b7fd2;
+    --crayon-purple: #a57bd3;
+    --crayon-lilac: #a390c4;
+    --crayon-yellow: #efb64c;
+    --crayon-green: #97bd5a;
+    --margin-w: min(11vw, 220px);
+    --paper-tile: url('./assets/crayon/paper.webp');
+    --frame-h: url('./assets/crayon/line-double.webp');
+    --frame-v: url('./assets/crayon/line-double-v.webp');
+
+    --bg: var(--paper);
+    --bg-alt: var(--paper);
+    --panel: var(--paper);
+    --panel-soft: var(--paper);
+    --panel-strong: var(--paper);
+    --panel-ink: transparent;
+    --text: var(--ink);
+    --text-soft: var(--ink-soft);
+    --text-strong: var(--ink-strong);
+    --line: var(--frame-mauve);
+    --line-strong: var(--frame-mauve);
+    --accent: var(--crayon-blue);
+    --accent-strong: var(--crayon-blue);
+    --field-fill: var(--paper);
+    --viewer-panel: var(--paper);
+    --viewer-line: var(--frame-mauve);
+    --viewer-ink: var(--ink);
+
+    background: var(--paper) var(--paper-tile) 0 0 / 512px 768px;
+    color: var(--ink);
+    font-family: var(--font-hand);
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .crayon ::selection {
+    background: var(--crayon-pink);
+    color: #fff;
+  }
+
+  /* Hand-ruled crayon rectangle. Lines overshoot the corners like a quick sketch. */
+  .crayon-frame,
+  .crayon .forum-button,
+  .crayon .forum-meta-box,
+  .crayon .lightbox-frame,
+  .crayon .bar-loader-track {
+    position: relative;
+  }
+
+  .crayon-frame::before,
+  .crayon .forum-button::before,
+  .crayon .forum-meta-box::before,
+  .crayon .lightbox-frame::before,
+  .crayon .bar-loader-track::before {
+    --o: var(--frame-overshoot, 4px);
+    --lw: var(--frame-band, 18px);
+    content: '';
+    position: absolute;
+    inset: calc(var(--o) * -1);
+    z-index: var(--frame-z, 2);
+    pointer-events: none;
+    background: var(--frame-color, var(--frame-mauve));
+    mask-image: var(--frame-h), var(--frame-h), var(--frame-v), var(--frame-v);
+    mask-size:
+      auto var(--lw),
+      auto var(--lw),
+      var(--lw) auto,
+      var(--lw) auto;
+    mask-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
+    mask-position:
+      var(--frame-shift, 0px) 0,
+      calc(var(--frame-shift, 0px) - 237px) 100%,
+      0 calc(var(--frame-shift, 0px) - 153px),
+      100% calc(var(--frame-shift, 0px) - 411px);
+  }
+
+  .crayon-margin {
+    --u: min(calc(var(--margin-w) / 175), calc(100vh / 971));
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    z-index: 0;
+    width: var(--margin-w);
+    pointer-events: none;
+  }
+
+  .crayon-margin-left {
+    left: 0;
+  }
+
+  .crayon-margin-right {
+    right: 0;
+  }
+
+  .crayon-doodle {
+    position: absolute;
+    left: calc(var(--u) * var(--x));
+    top: calc(100vh * var(--y) / 971);
+    width: calc(var(--u) * var(--w));
+    max-width: none;
+    height: auto;
+    rotate: var(--r, 0deg);
+  }
+
+  .crayon .crayon-page {
+    position: relative;
+    z-index: 1;
+    max-width: none;
+    margin-inline: var(--margin-w);
+    padding-block: 6px;
+  }
+
+  .crayon-window {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+    gap: 6px;
+    padding: 5px 6px 6px;
+  }
+
+  .crayon-titlebar,
+  .crayon .forum-window-bar {
+    display: flex;
+    min-height: 42px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 3px 14px 4px 10px;
+    border-style: solid;
+    border-width: 0;
+    border-image: url('./assets/crayon/titlebar.webp') 0 32 fill / 0 17px / 0 round;
+    border-image-repeat: round stretch;
+    background: none;
+    box-shadow: none;
+    text-shadow: none;
+    color: #fff;
+  }
+
+  .crayon-titlebar-badge {
+    height: 30px;
+    width: auto;
+    flex-shrink: 0;
+  }
+
+  .crayon-titlebar-text {
+    font-size: 21px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-shadow:
+      0 1px 0 rgba(8, 44, 130, 0.45),
+      0 0 3px rgba(8, 44, 130, 0.35);
+  }
+
+  .crayon-titlebar-actions {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .crayon-titlebar-button {
+    display: inline-flex;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    transition:
+      opacity 0.15s ease,
+      translate 0.12s ease;
+  }
+
+  .crayon-titlebar-button img {
+    height: 30px;
+    width: auto;
+    max-width: none;
+  }
+
+  .crayon-titlebar-button[aria-pressed='false'] {
+    opacity: 0.72;
+  }
+
+  .crayon-titlebar-button:hover {
+    opacity: 1;
+  }
+
+  .crayon-titlebar-button:active {
+    translate: 0 1px;
+  }
+
+  .crayon-titlebar-button:focus-visible {
+    outline: 2px dashed #fff;
+    outline-offset: 2px;
+  }
+
+  .crayon-content {
+    --frame-overshoot: 5px;
+    --frame-h: url('./assets/crayon/line-single.webp');
+    --frame-v: url('./assets/crayon/line-single-v.webp');
+    --frame-band: 13px;
+    --frame-shift: 71px;
+    min-height: 0;
+    flex: 1;
+    margin: 2px 4px;
+  }
+
+  .crayon-scroll-area {
+    position: relative;
+    height: 100%;
+  }
+
+  .crayon-scroll {
+    height: 100%;
+    overflow-y: auto;
+    scrollbar-width: none;
+    padding: 14px 52px 18px 22px;
+  }
+
+  .crayon-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .crayon-scrollbar {
+    position: absolute;
+    top: 10px;
+    right: 9px;
+    bottom: 10px;
+    z-index: 5;
+    width: 30px;
+    border-style: solid;
+    border-width: 0;
+    border-image: url('./assets/crayon/scroll-track.webp') 69 0 fill / 34px 0 / 0 stretch;
+    border-image-repeat: stretch round;
+  }
+
+  .crayon-scrollbar-arrow {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 34px;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+
+  .crayon-scrollbar-arrow-up {
+    top: 0;
+  }
+
+  .crayon-scrollbar-arrow-down {
+    bottom: 0;
+  }
+
+  .crayon-scrollbar-thumb {
+    position: absolute;
+    left: 6px;
+    width: 18px;
+    border-style: solid;
+    border-width: 0;
+    border-image: url('./assets/crayon/scroll-thumb.webp') 23 0 fill / 9px 0 / 0 stretch;
+    border-image-repeat: stretch round;
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .crayon-scrollbar-thumb:active {
+    cursor: grabbing;
+  }
+
+  .crayon-heading {
+    position: relative;
+    z-index: 7;
+    height: 70px;
+    pointer-events: none;
+  }
+
+  .crayon-heading h1 {
+    margin: 0;
+  }
+
+  .crayon-heading-name {
+    position: absolute;
+    left: 6px;
+    top: -2px;
+    width: 138px;
+    max-width: none;
+    rotate: -2deg;
+  }
+
+  .crayon-heading-heart {
+    position: absolute;
+    left: 154px;
+    top: 10px;
+    width: 38px;
+    max-width: none;
+    rotate: 8deg;
+  }
+
+  .crayon-heading-rainbow {
+    position: absolute;
+    left: 212px;
+    top: -2px;
+    width: 138px;
+    max-width: none;
+  }
+
+  .crayon-card {
+    padding: 13px 13px 0;
+    background: var(--paper-tile) var(--paper-x, 0) var(--paper-y, 0) / 512px 768px;
+    transform: var(--tilt-transform);
+    transform-style: preserve-3d;
+    transition: transform 0.16s ease;
+    cursor: pointer;
+  }
+
+  .crayon-card:focus-visible {
+    outline: 2px dashed var(--frame-color);
+    outline-offset: 6px;
+  }
+
+  .crayon-card-photo {
+    --frame-h: url('./assets/crayon/line-single.webp');
+    --frame-v: url('./assets/crayon/line-single-v.webp');
+    --frame-band: 13px;
+    --frame-overshoot: 5px;
+    --frame-z: 3;
+  }
+
+  .crayon-card-photo::before {
+    opacity: 0.55;
+  }
+
+  .crayon-card-slot {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  .crayon-card-slot > img,
+  .crayon-card-slot > video {
+    display: block;
+    height: 100%;
+    width: 100%;
+    object-fit: cover;
+  }
+
+  .pencil-media {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+  }
+
+  .pencil-media[data-pencil='failed'],
+  [data-pencil-enabled='false'] > .pencil-media,
+  .group:hover .pencil-media,
+  .group:focus-visible .pencil-media {
+    opacity: 1;
+  }
+
+  [data-pencil-enabled='false'] > .pencil-sprite {
+    display: none;
+  }
+
+  .pencil-sprite {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+  }
+
+  .pencil-sprite[data-ready='true'] {
+    opacity: 1;
+  }
+
+  .pencil-sprite canvas {
+    display: block;
+    width: 100%;
+    height: calc(100% * var(--frames));
+  }
+
+  .pencil-sprite[data-frames='3'] canvas {
+    animation: pencil-boil 3s steps(3) infinite;
+    animation-delay: var(--boil-delay, 0s);
+  }
+
+  @keyframes pencil-boil {
+    to {
+      transform: translateY(-100%);
+    }
+  }
+
+  .crayon-caption {
+    display: flex;
+    min-height: 60px;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 10px 40px 9px 4px;
+  }
+
+  .crayon-caption-icon {
+    width: 24px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .crayon-caption-title {
+    margin: 0;
+    font-size: 17px;
+    line-height: 1.2;
+    letter-spacing: 0.05em;
+    color: var(--ink);
+  }
+
+  .crayon-caption-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 2px;
+    font-size: 12.5px;
+    line-height: 1.2;
+    color: #8c7c72;
+  }
+
+  .crayon-caption-stars {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .crayon-caption-stars img {
+    width: 16px;
+  }
+
+  .crayon-caption-doodle {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    width: 30px;
+    pointer-events: none;
+  }
+
+  .crayon-sticker {
+    position: absolute;
+    z-index: 6;
+    max-width: none;
+    pointer-events: none;
+    rotate: var(--r, 0deg);
+  }
+
+  .crayon .forum-group-heading {
+    justify-content: flex-start;
+    gap: 12px;
+    border: 0;
+    padding: 4px 4px 6px;
+    font-size: 19px;
+    font-weight: 600;
+    color: var(--ink-strong);
+  }
+
+  .crayon .forum-group-heading span:last-child {
+    font-size: 16px;
+    color: var(--ink-soft);
+  }
+
+  .crayon .forum-empty-state {
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+    font-size: 17px;
+    color: var(--ink);
+  }
+
+  .crayon .forum-empty-state p {
+    font-size: 17px;
+    font-weight: 500;
+  }
+
+  .crayon .bar-loader {
+    color: var(--ink);
+  }
+
+  .crayon .bar-loader-track {
+    --frame-overshoot: 5px;
+    --frame-h: url('./assets/crayon/line-single.webp');
+    --frame-v: url('./assets/crayon/line-single-v.webp');
+    --frame-band: 13px;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .crayon .bar-loader-segment {
+    border: 0;
+    background: var(--crayon-blue);
+    mask-image: url('./assets/crayon/grain.webp');
+    mask-size: 48px 48px;
+  }
+
+  .crayon .bar-loader-segment:nth-child(6n + 1) {
+    background: var(--crayon-pink);
+  }
+
+  .crayon .bar-loader-segment:nth-child(6n + 2) {
+    background: var(--crayon-yellow);
+  }
+
+  .crayon .bar-loader-segment:nth-child(6n + 3) {
+    background: var(--crayon-green);
+  }
+
+  .crayon .bar-loader-segment:nth-child(6n + 5) {
+    background: var(--crayon-purple);
+  }
+
+  .crayon .bar-loader-segment:nth-child(6n) {
+    background: var(--crayon-lilac);
+  }
+
+  .crayon .bar-loader-label {
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: none;
+  }
+
+  .crayon .lightbox-frame {
+    --frame-z: 30;
+    gap: 5px;
+    overflow: visible;
+    border: 0;
+    padding: 6px;
+    background: var(--paper) var(--paper-tile) 0 0 / 512px 768px;
+    box-shadow: 0 16px 34px rgba(92, 79, 71, 0.28);
+  }
+
+  .crayon .forum-window-badge {
+    height: 26px;
+    min-width: 40px;
+    border: 0;
+    padding: 0 8px;
+    background: url('./assets/crayon/button-heart.webp') center / 100% 100%;
+    box-shadow: none;
+    font-size: 0;
+  }
+
+  .crayon .forum-button {
+    --frame-overshoot: 1.5px;
+    --frame-h: url('./assets/crayon/line-single.webp');
+    --frame-v: url('./assets/crayon/line-single-v.webp');
+    --frame-band: 13px;
+    --frame-shift: -40px;
+    min-height: 30px;
+    gap: 5px;
+    border: 0;
+    padding: 3px 10px;
+    background: rgba(252, 247, 238, 0.88);
+    box-shadow: none;
+    color: var(--ink);
+  }
+
+  .crayon .forum-button:hover {
+    background: #fdfaf4;
+  }
+
+  .crayon .forum-button:active,
+  .crayon .forum-button[aria-pressed='true'] {
+    border: 0;
+    padding: 4px 10px 2px;
+    background: #efe7f0;
+    box-shadow: none;
+  }
+
+  .crayon .forum-button:focus-visible {
+    outline: 2px dashed var(--crayon-blue);
+    outline-offset: 3px;
+  }
+
+  .crayon .forum-button-label {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .crayon .lightbox-title-button {
+    background: var(--paper);
+    color: var(--ink) !important;
+  }
+
+  .crayon .forum-window-bar .lightbox-title-button {
+    min-height: 26px !important;
+  }
+
+  .crayon .star-marker-active {
+    --frame-color: var(--crayon-yellow);
+    background: rgba(239, 182, 76, 0.22);
+    color: var(--ink-strong);
+  }
+
+  .crayon .forum-meta-box {
+    --frame-overshoot: 5px;
+    --frame-h: url('./assets/crayon/line-single.webp');
+    --frame-v: url('./assets/crayon/line-single-v.webp');
+    --frame-band: 13px;
+    --frame-shift: -90px;
+    border: 0;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.25);
+    box-shadow: none;
+  }
+
+  .crayon .forum-meta-term,
+  .crayon .lightbox-detail-row .font-bold {
+    font-weight: 500;
+    color: var(--ink-soft);
+  }
+
+  .crayon .forum-meta-desc {
+    color: var(--ink-strong);
+  }
+
+  .crayon .lightbox-frame .border-b,
+  .crayon .lightbox-frame .border-r,
+  .crayon .lightbox-frame section div {
+    border-color: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .crayon .forum-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--crayon-lilac) transparent;
+  }
+
+  .crayon .lightbox-frame select {
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pencil-sprite canvas {
+      animation: none !important;
+    }
+  }
+
+  @media (max-width: 999px) {
+    .crayon {
+      --margin-w: 0px;
+    }
+
+    .crayon-margin {
+      display: none;
+    }
+
+    .crayon .crayon-page {
+      margin-inline: 4px;
+    }
+  }
+
+  @media (max-width: 767px) {
+    .crayon-scroll {
+      padding: 10px 44px 14px 14px;
+    }
+
+    .crayon-titlebar-text {
+      font-size: 18px;
+    }
+  }
+}
+
+html:has(.crayon),
+html:has(.crayon) body {
+  scrollbar-gutter: auto;
+  background: #f8efe1;
+}
+
+/* Unlayered so these win over the Tailwind size utilities used inside the Lightbox. */
+.crayon .forum-window-bar .text-\[12px\] {
+  font-size: 18px;
+  font-weight: 600;
+  text-shadow:
+    0 1px 0 rgba(8, 44, 130, 0.45),
+    0 0 3px rgba(8, 44, 130, 0.35);
+}
+
+.crayon .lightbox-frame .text-\[11px\],
+.crayon .lightbox-frame .text-\[10px\],
+.crayon .forum-meta-table {
+  font-size: 13.5px;
+}
+
+.crayon .lightbox-frame .uppercase {
+  text-transform: none;
+  letter-spacing: 0.04em;
+}
+
+.crayon .lightbox-frame .font-bold {
+  font-weight: 500;
+}
+
+.crayon .forum-meta-box > p:first-child {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink-strong);
+}
+
+@media (max-width: 480px) {
+  .crayon .crayon-heading {
+    zoom: 0.8;
+  }
+}
+
+.crayon .lightbox-frame .gap-1 {
+  gap: 12px;
+}

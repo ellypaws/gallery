@@ -10,6 +10,7 @@ export type GalleryItem = {
   src: string
   originalSrc: string
   placeholder: string
+  crayonSrc: string
   srcSet: string
   sources: GallerySource[]
   sizes: string

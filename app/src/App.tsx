@@ -315,6 +315,20 @@ function App() {
       })
   }
 
+  function handleFullResolutionLoad(photoID: number) {
+    setPhotos((current) =>
+      current.map((photo) =>
+        photo.id === photoID && photo.originalSrc && photo.src !== photo.originalSrc
+          ? {
+              ...photo,
+              src: photo.originalSrc,
+              srcSet: '',
+            }
+          : photo,
+      ),
+    )
+  }
+
   const groupedPhotos = useMemo<{ label: string; items: { globalIndex: number; photo: GalleryItem }[] }[]>(() => {
     if (!isGrouped) {
       return [{ label: '', items: photos.map((photo, index) => ({ photo, globalIndex: index })) }]
@@ -553,6 +567,7 @@ function App() {
               onPrev={() => setWindowPhoto(windowItem.id, (current) => (current - 1 + photos.length) % photos.length)}
               onNext={() => setWindowPhoto(windowItem.id, (current) => (current + 1) % photos.length)}
               onStar={handleToggleStar}
+              onFullResolutionLoad={handleFullResolutionLoad}
             />
           ))}
         </div>

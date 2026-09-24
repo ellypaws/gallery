@@ -83,6 +83,8 @@ type Source struct {
 	Duration float64 `json:"duration"`
 }
 
+const videoPreviewHeight = 1080
+
 type GalleryInteraction struct {
 	PhotoID    uint  `json:"photoId"`
 	ViewCount  int64 `json:"viewCount"`
@@ -808,8 +810,7 @@ func (s *Service) toGalleryItem(photo models.Photo) GalleryItem {
 	largest := pickLargestDerivative(photo.Derivatives)
 	display := largest
 	if mediaType == "video" {
-		largest = pickLargestVideoDerivative(photo.Derivatives)
-		display = pickSmallestVideoDerivative(photo.Derivatives)
+		display = pickVideoPreviewDerivative(photo.Derivatives, videoPreviewHeight)
 	}
 	placeholder := pickVariant(photo.Derivatives, "placeholder")
 	if mediaType == "video" {
@@ -839,10 +840,10 @@ func (s *Service) toGalleryItem(photo models.Photo) GalleryItem {
 		Height:          photo.Height,
 		Duration:        photo.Duration,
 		Src:             s.cfg.CacheURL(display.RelativePath),
-		OriginalSrc:     s.originalURL(photo, mediaType, largest),
+		OriginalSrc:     s.originalURL(photo, mediaType),
 		Placeholder:     s.cfg.CacheURL(placeholder.RelativePath),
 		SrcSet:          buildSrcSet(s.cfg, photo.Derivatives, mediaType),
-		Sources:         buildSources(s.cfg, photo.Derivatives, photo.Duration),
+		Sources:         buildSources(s.cfg, photo, photo.Derivatives),
 		Sizes:           "(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw",
 		Camera:          strings.TrimSpace(strings.TrimSpace(photo.Exif.CameraMake + " " + photo.Exif.CameraModel)),
 		Lens:            lensModel,
@@ -861,11 +862,8 @@ func (s *Service) toGalleryItem(photo models.Photo) GalleryItem {
 	}
 }
 
-func (s *Service) originalURL(photo models.Photo, mediaType string, largest models.Derivative) string {
+func (s *Service) originalURL(photo models.Photo, mediaType string) string {
 	if mediaType == "video" {
-		if largest.RelativePath != "" {
-			return s.cfg.CacheURL(largest.RelativePath)
-		}
 		return s.cfg.OriginalURL(photo.RelativePath)
 	}
 	if len(photo.Hash) >= 4 {
@@ -889,8 +887,12 @@ func buildSrcSet(cfg config.Config, rows []models.Derivative, mediaType string) 
 	return strings.Join(parts, ", ")
 }
 
-func buildSources(cfg config.Config, rows []models.Derivative, duration float64) []Source {
-	sources := make([]Source, 0, len(rows))
+func buildSources(cfg config.Config, photo models.Photo, rows []models.Derivative) []Source {
+	if normalizeMediaType(photo) != "video" {
+		return nil
+	}
+
+	sources := make([]Source, 0, len(rows)+1)
 	for _, row := range rows {
 		if !strings.HasPrefix(row.Variant, "video-") {
 			continue
@@ -901,12 +903,21 @@ func buildSources(cfg config.Config, rows []models.Derivative, duration float64)
 			Width:    row.Width,
 			Height:   row.Height,
 			MimeType: row.MimeType,
-			Bitrate:  bitrateFor(row.ByteSize, duration),
-			Duration: duration,
+			Bitrate:  bitrateFor(row.ByteSize, photo.Duration),
+			Duration: photo.Duration,
 		})
 	}
 	sort.Slice(sources, func(i, j int) bool {
 		return sources[i].Height < sources[j].Height
+	})
+	sources = append(sources, Source{
+		Label:    "Original",
+		Src:      cfg.OriginalURL(photo.RelativePath),
+		Width:    photo.Width,
+		Height:   photo.Height,
+		MimeType: photo.MimeType,
+		Bitrate:  bitrateFor(photo.ByteSize, photo.Duration),
+		Duration: photo.Duration,
 	})
 	return sources
 }
@@ -924,28 +935,22 @@ func pickLargestDerivative(rows []models.Derivative) models.Derivative {
 	return best
 }
 
-func pickLargestVideoDerivative(rows []models.Derivative) models.Derivative {
+func pickVideoPreviewDerivative(rows []models.Derivative, maxHeight int) models.Derivative {
 	best := models.Derivative{}
+	smallest := models.Derivative{}
 	for _, row := range rows {
 		if !strings.HasPrefix(row.Variant, "video-") {
 			continue
 		}
-		if row.Height > best.Height {
+		if smallest.RelativePath == "" || row.Height < smallest.Height {
+			smallest = row
+		}
+		if row.Height <= maxHeight && row.Height > best.Height {
 			best = row
 		}
 	}
-	return best
-}
-
-func pickSmallestVideoDerivative(rows []models.Derivative) models.Derivative {
-	best := models.Derivative{}
-	for _, row := range rows {
-		if !strings.HasPrefix(row.Variant, "video-") {
-			continue
-		}
-		if best.ID == 0 || row.Height < best.Height {
-			best = row
-		}
+	if best.RelativePath == "" {
+		return smallest
 	}
 	return best
 }

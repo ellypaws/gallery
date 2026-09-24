@@ -20,6 +20,7 @@ type LightboxProps = {
   onPrev: () => void
   onNext: () => void
   onStar: (photoID: number) => void
+  onFullResolutionLoad: (photoID: number) => void
 }
 
 type MetaRow = {
@@ -49,6 +50,7 @@ export function Lightbox({
   onPrev,
   onNext,
   onStar,
+  onFullResolutionLoad,
 }: LightboxProps) {
   const overlayRef = useRef<HTMLDivElement | null>(null)
   const frameRef = useRef<HTMLDivElement | null>(null)
@@ -78,6 +80,13 @@ export function Lightbox({
     | null
   >(null)
   const isLoading = loadedPhotoId !== photo.id
+
+  function handleMediaLoad() {
+    setLoadedPhotoId(photo.id)
+    if (photo.originalSrc && assetURL === photo.originalSrc) {
+      onFullResolutionLoad(photo.id)
+    }
+  }
 
   useLayoutEffect(() => {
     if (dragStateRef.current) {
@@ -323,7 +332,7 @@ export function Lightbox({
                   src={assetURL || photo.src}
                   poster={photo.placeholder}
                   title={photo.alt}
-                  onLoad={() => setLoadedPhotoId(photo.id)}
+                  onLoad={handleMediaLoad}
                   className={`transition-opacity duration-150 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
                 />
               ) : (
@@ -333,7 +342,7 @@ export function Lightbox({
                   alt={photo.alt}
                   naturalWidth={photo.width}
                   naturalHeight={photo.height}
-                  onLoad={() => setLoadedPhotoId(photo.id)}
+                  onLoad={handleMediaLoad}
                   className={`transition-opacity duration-150 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
                   hideControls
                 />
@@ -540,7 +549,7 @@ export function Lightbox({
                       src={assetURL || photo.src}
                       poster={photo.placeholder}
                       title={photo.alt}
-                      onLoad={() => setLoadedPhotoId(photo.id)}
+                      onLoad={handleMediaLoad}
                       className={`transition-opacity duration-150 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
                     />
                   ) : (
@@ -550,7 +559,7 @@ export function Lightbox({
                       alt={photo.alt}
                       naturalWidth={photo.width}
                       naturalHeight={photo.height}
-                      onLoad={() => setLoadedPhotoId(photo.id)}
+                      onLoad={handleMediaLoad}
                       className={`transition-opacity duration-150 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
                     />
                   )}

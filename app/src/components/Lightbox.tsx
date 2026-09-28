@@ -765,15 +765,23 @@ function VideoPlayer({
   onLoad: () => void
   className?: string
 }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+
+  useLayoutEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.volume = 0.1
+    }
+  }, [])
+
   return (
     <video
+      ref={videoRef}
       src={src}
       poster={poster}
       title={title}
       autoPlay
       controls
       loop
-      muted
       playsInline
       preload="metadata"
       onLoadedData={onLoad}

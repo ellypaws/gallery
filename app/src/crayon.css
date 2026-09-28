@@ -354,34 +354,38 @@
     object-fit: cover;
   }
 
+  /* The photo sits under the drawing. It appears instantly and hides only after the drawing
+     has faded in over it, so a crossfade never shows bare paper. */
   .pencil-media {
     position: absolute;
     inset: 0;
     opacity: 0;
-    transition: opacity 0.35s ease;
+    transition: opacity 0s linear 0.36s;
   }
 
-  .pencil-media[data-pencil='failed'],
-  [data-pencil-enabled='false'] > .pencil-media,
+  .crayon-card-slot:is([data-pencil-enabled='false'], [data-pencil-state='failed'], [data-hold-photo='true']) > .pencil-media,
   .group:hover .pencil-media,
   .group:focus-visible .pencil-media {
     opacity: 1;
-  }
-
-  [data-pencil-enabled='false'] > .pencil-sprite {
-    display: none;
+    transition: none;
   }
 
   .pencil-sprite {
     position: absolute;
     inset: 0;
+    z-index: 1;
     overflow: hidden;
     opacity: 0;
     transition: opacity 0.35s ease;
   }
 
-  .pencil-sprite[data-ready='true'] {
+  [data-pencil-enabled='true'][data-pencil-state='ready'] > .pencil-sprite {
     opacity: 1;
+  }
+
+  .group:hover .pencil-sprite,
+  .group:focus-visible .pencil-sprite {
+    opacity: 0;
   }
 
   .pencil-sprite canvas {

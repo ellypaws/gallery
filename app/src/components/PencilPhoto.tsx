@@ -25,6 +25,11 @@ export function PencilPhoto({ photo, sizes, enabled }: PencilPhotoProps) {
   const [slotSize, setSlotSize] = useState<SlotSize | null>(null)
   const [isMediaReady, setIsMediaReady] = useState(false)
   const [state, setState] = useState<PencilState>('pending')
+  // Once the plain photo has been shown, keep it up until the drawing is ready to cover it.
+  const [hasShownPhoto, setHasShownPhoto] = useState(!enabled)
+  if (!enabled && !hasShownPhoto) {
+    setHasShownPhoto(true)
+  }
   const [frames] = useState(() => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : PENCIL_FRAMES))
 
   useLayoutEffect(() => {
@@ -133,8 +138,14 @@ export function PencilPhoto({ photo, sizes, enabled }: PencilPhotoProps) {
   }
 
   return (
-    <div ref={slotRef} className="crayon-card-slot h-full" data-pencil-enabled={enabled}>
-      <div className="pencil-sprite" data-ready={state === 'ready'} data-frames={frames} style={spriteStyle} aria-hidden="true">
+    <div
+      ref={slotRef}
+      className="crayon-card-slot h-full"
+      data-pencil-enabled={enabled}
+      data-pencil-state={state}
+      data-hold-photo={hasShownPhoto && state === 'pending'}
+    >
+      <div className="pencil-sprite" data-frames={frames} style={spriteStyle} aria-hidden="true">
         <canvas ref={canvasRef} />
       </div>
       {photo.mediaType === 'video' ? (
@@ -150,7 +161,6 @@ export function PencilPhoto({ photo, sizes, enabled }: PencilPhotoProps) {
           playsInline
           preload="metadata"
           onLoadedData={() => setIsMediaReady(true)}
-          data-pencil={state}
           className="pencil-media"
         />
       ) : (
@@ -166,7 +176,6 @@ export function PencilPhoto({ photo, sizes, enabled }: PencilPhotoProps) {
           decoding="async"
           onLoad={() => setIsMediaReady(true)}
           onError={() => setState('failed')}
-          data-pencil={state}
           className="pencil-media"
         />
       )}
